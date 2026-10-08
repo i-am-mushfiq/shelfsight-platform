@@ -1,0 +1,11 @@
+{
+  "name": "smoke-v0",
+  "purpose": "smoke",
+  "notes": "Two AI-generated shelf images from test_assets with count-level ground truth encoded in their filenames. They show a generic 'SQUARE' mark, not Square Toiletries packaging. This is a regression smoke test only; it is NOT a holdout and must not be used to claim field accuracy.",
+  "items": [
+    {"image": "../../../test_assets/shelf-square-high-6-of-12.png", "slices": {"source": "ai-generated", "layout": "3x4"},
+     "counts": {"total": 12, "own": 6, "rows": 3}},
+    {"image": "../../../test_assets/shelf-square-low-1-of-12.png", "slices": {"source": "ai-generated", "layout": "3x4"},
+     "counts": {"total": 12, "own": 1, "rows": 3}}
+  ]
+}

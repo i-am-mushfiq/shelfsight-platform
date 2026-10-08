@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/session.dart';
+import '../services/platform_api.dart';
 import '../theme/app_theme.dart';
 import 'login_screen.dart';
 import '../widgets/app_widgets.dart';
@@ -248,6 +249,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 height: 56,
                 child: OutlinedButton.icon(
                   onPressed: () {
+                    PlatformApi.instance.signOut();
                     currentSession.value = null;
                     Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(builder: (_) => const LoginScreen()),

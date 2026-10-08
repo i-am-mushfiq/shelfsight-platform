@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../models/session.dart';
+import '../services/platform_api.dart';
+import '../services/upload_queue.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_widgets.dart';
 import '../widgets/shell_widgets.dart';
 import '../widgets/street_map.dart';
-import 'capture_screen.dart';
+import 'outlet_screen.dart';
 
 class SalesHomeScreen extends StatefulWidget {
   const SalesHomeScreen({super.key, required this.session});
@@ -17,46 +19,56 @@ class SalesHomeScreen extends StatefulWidget {
 
 class _SalesHomeScreenState extends State<SalesHomeScreen> {
   final _mapKey = GlobalKey<StreetMapState>();
-  late final ({Shop shop, double meters})? _detected = DemoData.detect(
-    DemoData.userLat,
-    DemoData.userLng,
-  );
+  List<Shop> _shops = const [];
+  ({Shop shop, double meters})? _detected;
   Shop? _selected;
+  bool _loading = true;
+  String? _error;
 
   Shop? get _active => _selected ?? _detected?.shop;
   bool get _atActiveShop => _active != null && _active!.id == _detected?.shop.id;
 
   double? get _activeMeters => _active == null
       ? null
-      : distanceMeters(
-          DemoData.userLat,
-          DemoData.userLng,
-          _active!.lat,
-          _active!.lng,
-        );
+      : distanceMeters(SimulatedGps.lat, SimulatedGps.lng, _active!.lat, _active!.lng);
 
-  void _openCategory(ProductCategory c) {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    if (!c.active) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('${c.name} analysis is coming soon.')),
-      );
-      return;
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final shops = (await PlatformApi.instance.outlets()).map(Shop.fromJson).toList();
+      if (!mounted) return;
+      setState(() {
+        _shops = shops;
+        _detected = SimulatedGps.detect(shops);
+        _selected = shops.where((s) => s.id == _selected?.id).firstOrNull;
+        _loading = false;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.message;
+        _loading = false;
+      });
     }
-    if (!_atActiveShop) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Go to the shop to start. Visits need GPS match.'),
-        ),
-      );
-      return;
-    }
-    Navigator.of(context).push(
+  }
+
+  Future<void> _open(Shop shop) async {
+    await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => CaptureScreen(storeName: _active!.name),
+        settings: const RouteSettings(name: OutletScreen.routeName),
+        builder: (_) => OutletScreen(shop: shop, atShop: shop.id == _detected?.shop.id),
       ),
     );
+    if (mounted) _load(); // visits and recommendations may have changed
   }
 
   @override
@@ -69,7 +81,7 @@ class _SalesHomeScreenState extends State<SalesHomeScreen> {
         Positioned.fill(
           child: StreetMap(
             key: _mapKey,
-            shops: DemoData.shops,
+            shops: _shops,
             detectedShopId: _detected?.shop.id,
             selectedShopId: _selected?.id,
             topInset: top,
@@ -89,7 +101,7 @@ class _SalesHomeScreenState extends State<SalesHomeScreen> {
             child: const Padding(
               padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               child: Text(
-                '© OpenStreetMap contributors',
+                '© OpenStreetMap contributors · simulated GPS',
                 style: TextStyle(fontSize: 10, color: Color(0xFF475569)),
               ),
             ),
@@ -143,59 +155,86 @@ class _SalesHomeScreenState extends State<SalesHomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                _ShopStatusCard(
-                  shop: _active,
-                  meters: _activeMeters,
-                  atShop: _atActiveShop,
-                ),
-                const SizedBox(height: 22),
-                const Text(
-                  'Product category',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -.3,
-                    color: AppColors.ink,
+                if (_loading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 28),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_error != null)
+                  SurfaceCard(
+                    color: AppColors.redSoft,
+                    borderColor: AppColors.red,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _error!,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        PrimaryButton(
+                          label: 'Try again',
+                          icon: Icons.refresh_rounded,
+                          onPressed: _load,
+                        ),
+                      ],
+                    ),
+                  )
+                else ...[
+                  _ShopStatusCard(
+                    shop: _active,
+                    meters: _activeMeters,
+                    atShop: _atActiveShop,
                   ),
-                ),
-                const SizedBox(height: 10),
-                GridView.count(
-                  crossAxisCount: 2,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                  childAspectRatio: 1.75,
-                  children: [
-                    for (final c in productCategories)
-                      _CategoryTile(
-                        category: c,
-                        enabled: c.active && _atActiveShop,
-                        onTap: () => _openCategory(c),
-                      ),
+                  if (_active != null) ...[
+                    const SizedBox(height: 12),
+                    PrimaryButton(
+                      label: 'Open outlet',
+                      icon: Icons.insights_rounded,
+                      onPressed: () => _open(_active!),
+                    ),
                   ],
-                ),
-                const SizedBox(height: 22),
-                const Text(
-                  'Assigned shops',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -.3,
-                    color: AppColors.ink,
+                  ListenableBuilder(
+                    listenable: UploadQueue.instance,
+                    builder: (context, _) {
+                      final pending = UploadQueue.instance.pendingCount;
+                      if (pending == 0) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: StatusPill(
+                          label: '$pending photo${pending == 1 ? '' : 's'} waiting to upload',
+                          icon: Icons.cloud_upload_outlined,
+                          color: const Color(0xFF92580A),
+                          background: AppColors.amberSoft,
+                        ),
+                      );
+                    },
                   ),
-                ),
-                const SizedBox(height: 10),
-                for (final s in DemoData.shops)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _ShopRow(
-                      shop: s,
-                      detected: s.id == _detected?.shop.id,
-                      selected: s.id == _active?.id,
-                      onTap: () => setState(() => _selected = s),
+                  const SizedBox(height: 22),
+                  const Text(
+                    'Assigned shops',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -.3,
+                      color: AppColors.ink,
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  for (final s in _shops)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _ShopRow(
+                        shop: s,
+                        detected: s.id == _detected?.shop.id,
+                        selected: s.id == _active?.id,
+                        onTap: () => _open(s),
+                      ),
+                    ),
+                ],
               ],
             ),
           ),
@@ -206,9 +245,7 @@ class _SalesHomeScreenState extends State<SalesHomeScreen> {
           right: 0,
           child: ShelfSightHeader(
             title: 'Hi, ${widget.session.name.split(' ').first}',
-            subtitle:
-                '${widget.session.territory} · ${DemoData.shops.length} shops',
-            alertCount: 2,
+            subtitle: '${widget.session.territory} · ${_shops.length} shops',
           ),
         ),
       ],
@@ -313,92 +350,6 @@ class _ShopStatusCard extends StatelessWidget {
               background: AppColors.amberSoft,
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _CategoryTile extends StatelessWidget {
-  const _CategoryTile({
-    required this.category,
-    required this.enabled,
-    required this.onTap,
-  });
-  final ProductCategory category;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  static const _icons = {
-    'Soap': Icons.clean_hands_rounded,
-    'Shampoo': Icons.water_drop_outlined,
-    'Toothpaste': Icons.brush_outlined,
-    'Detergent': Icons.local_laundry_service_outlined,
-    'Dishwashing Liquid': Icons.wash_outlined,
-    'Toilet Cleaner': Icons.cleaning_services_outlined,
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final active = category.active;
-    return Semantics(
-      button: true,
-      label: '${category.name}, ${active ? 'active' : 'coming soon'}',
-      excludeSemantics: true,
-      child: SurfaceCard(
-        onTap: onTap,
-        padding: const EdgeInsets.all(12),
-        color: active ? Colors.white : AppColors.surfaceAlt,
-        borderColor: active ? AppColors.emeraldDark : AppColors.border,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  _icons[category.name],
-                  color: active ? AppColors.emeraldDark : AppColors.inkMuted,
-                ),
-                const Spacer(),
-                if (active)
-                  const Icon(
-                    Icons.check_circle_rounded,
-                    size: 18,
-                    color: AppColors.emeraldDark,
-                  )
-                else
-                  const Icon(
-                    Icons.lock_outline_rounded,
-                    size: 16,
-                    color: AppColors.inkMuted,
-                  ),
-              ],
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  category.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14.5,
-                    color: active ? AppColors.ink : AppColors.inkMuted,
-                  ),
-                ),
-                Text(
-                  active ? 'Active' : 'Coming soon',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                    color: active ? AppColors.emeraldDark : AppColors.inkMuted,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }

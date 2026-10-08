@@ -34,7 +34,7 @@ class _AppShellState extends State<AppShell> {
     NavItem(
       Icons.notifications_none_rounded,
       Icons.notifications_rounded,
-      'Alerts',
+      'Exceptions',
     ),
     NavItem(Icons.groups_outlined, Icons.groups_rounded, 'Team'),
     NavItem(Icons.person_outline_rounded, Icons.person_rounded, 'Profile'),

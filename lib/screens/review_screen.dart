@@ -5,15 +5,21 @@ import 'package:image_picker/image_picker.dart';
 
 import '../theme/app_theme.dart';
 import '../widgets/app_widgets.dart';
-import 'analysis_processing_screen.dart';
+import 'audit_upload_screen.dart';
 
 class ReviewScreen extends StatefulWidget {
   const ReviewScreen({
     super.key,
     required this.storeName,
+    required this.visitId,
+    required this.categoryId,
+    required this.categoryName,
     required this.imagePaths,
   });
   final String storeName;
+  final String visitId;
+  final String categoryId;
+  final String categoryName;
   final List<String> imagePaths;
   @override
   State<ReviewScreen> createState() => _ReviewScreenState();
@@ -187,14 +193,17 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 border: Border(top: BorderSide(color: AppColors.border)),
               ),
               child: PrimaryButton(
-                label: 'Analyze shelf',
+                label: 'Upload and analyse',
                 icon: Icons.auto_awesome_rounded,
                 onPressed: _photos.isEmpty
                     ? null
                     : () => Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => AnalysisProcessingScreen(
+                          builder: (_) => AuditUploadScreen(
                             storeName: widget.storeName,
+                            visitId: widget.visitId,
+                            categoryId: widget.categoryId,
+                            categoryName: widget.categoryName,
                             imagePaths: List.unmodifiable(_photos),
                           ),
                         ),

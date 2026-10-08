@@ -61,7 +61,7 @@ class StreetMapState extends State<StreetMap>
   }
 
   void recenter(Size viewport) {
-    final user = MapProjection.project(DemoData.userLat, DemoData.userLng);
+    final user = MapProjection.project(SimulatedGps.lat, SimulatedGps.lng);
     const scale = 1.15;
     final cx = viewport.width / 2;
     final cy = widget.topInset +
@@ -82,7 +82,7 @@ class StreetMapState extends State<StreetMap>
             if (mounted) recenter(size);
           });
         }
-        final user = MapProjection.project(DemoData.userLat, DemoData.userLng);
+        final user = MapProjection.project(SimulatedGps.lat, SimulatedGps.lng);
         return Semantics(
           label: 'Street map showing your location and assigned shops',
           child: InteractiveViewer(

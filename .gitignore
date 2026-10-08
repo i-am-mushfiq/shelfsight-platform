@@ -60,3 +60,7 @@ test_assets/shelfsight-current-screen.png
 test_assets/square-logo-*.png
 __pycache__/
 .pytest_cache/
+
+# Platform runtime data (SQLite dev DB, blobs)
+var/
+.venv/

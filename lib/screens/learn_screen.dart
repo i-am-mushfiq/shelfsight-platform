@@ -96,9 +96,18 @@ class _LearnScreenState extends State<LearnScreen> {
   Widget build(BuildContext context) {
     return FixedHeaderScrollView(
       title: 'Learn',
-      subtitle: 'Audio sales coaching',
+      subtitle: 'Preview · audio not connected yet',
       slivers: [
         pagePadding([
+          const Padding(
+            padding: EdgeInsets.only(bottom: 12),
+            child: StatusPill(
+              label: 'Preview only: lesson playback is simulated. Real call coaching is a later milestone.',
+              icon: Icons.info_outline_rounded,
+              color: Color(0xFF92580A),
+              background: AppColors.amberSoft,
+            ),
+          ),
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(

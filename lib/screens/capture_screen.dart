@@ -7,8 +7,17 @@ import '../widgets/app_widgets.dart';
 import 'review_screen.dart';
 
 class CaptureScreen extends StatefulWidget {
-  const CaptureScreen({super.key, required this.storeName});
+  const CaptureScreen({
+    super.key,
+    required this.storeName,
+    required this.visitId,
+    required this.categoryId,
+    required this.categoryName,
+  });
   final String storeName;
+  final String visitId;
+  final String categoryId;
+  final String categoryName;
   @override
   State<CaptureScreen> createState() => _CaptureScreenState();
 }
@@ -349,6 +358,9 @@ class _CaptureScreenState extends State<CaptureScreen>
                             MaterialPageRoute(
                               builder: (_) => ReviewScreen(
                                 storeName: widget.storeName,
+                                visitId: widget.visitId,
+                                categoryId: widget.categoryId,
+                                categoryName: widget.categoryName,
                                 imagePaths: List.unmodifiable(_photos),
                               ),
                             ),

@@ -2,24 +2,50 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
+import '../services/platform_api.dart';
+
 enum UserRole { salesOfficer, territoryOfficer }
 
 class UserSession {
   const UserSession({
+    required this.id,
     required this.employeeId,
     required this.name,
     required this.role,
+    required this.roleCode,
     required this.territory,
+    required this.dataOrigin,
   });
 
+  factory UserSession.fromAuth(AuthUser user) => UserSession(
+    id: user.id,
+    employeeId: user.employeeId,
+    name: user.name,
+    // Supervisors, brand managers and management share the manager shell for now.
+    role: user.role == 'sales_officer' ? UserRole.salesOfficer : UserRole.territoryOfficer,
+    roleCode: user.role,
+    territory: user.territory,
+    dataOrigin: user.dataOrigin,
+  );
+
+  final String id;
   final String employeeId;
   final String name;
   final UserRole role;
+  final String roleCode;
   final String territory;
+  final String dataOrigin;
 
-  String get roleLabel => role == UserRole.salesOfficer
-      ? 'Sales Officer'
-      : 'Territory Officer';
+  bool get isSynthetic => dataOrigin == 'synthetic';
+
+  String get roleLabel => switch (roleCode) {
+    'sales_officer' => 'Sales Officer',
+    'supervisor' => 'Territory Officer',
+    'brand_manager' => 'Brand Manager',
+    'management' => 'Management',
+    'admin' => 'Administrator',
+    _ => roleCode,
+  };
 
   String get initials {
     final parts = name.trim().split(RegExp(r'\s+'));
@@ -27,113 +53,82 @@ class UserSession {
   }
 }
 
-/// Demo credential directory. Replace with the real auth API.
-/// SO-1001 / SO-1042 / TO-2001, password "shelf123".
-abstract final class DemoAuth {
-  static const password = 'shelf123';
-  static const _users = {
-    'SO-1001': UserSession(
-      employeeId: 'SO-1001',
-      name: 'Rahim Ahmed',
-      role: UserRole.salesOfficer,
-      territory: 'Dhaka North',
-    ),
-    'SO-1042': UserSession(
-      employeeId: 'SO-1042',
-      name: 'Rahim Ahmed',
-      role: UserRole.salesOfficer,
-      territory: 'Dhaka North',
-    ),
-    'TO-2001': UserSession(
-      employeeId: 'TO-2001',
-      name: 'Nusrat Jahan',
-      role: UserRole.territoryOfficer,
-      territory: 'Dhaka North',
-    ),
-  };
-
-  static UserSession? signIn(String id, String pass) {
-    final user = _users[id.trim().toUpperCase()];
-    return (user != null && pass == password) ? user : null;
-  }
-}
-
 /// Holds the signed-in user for the app lifetime.
 final ValueNotifier<UserSession?> currentSession = ValueNotifier(null);
 
+/// An outlet as the field app shows it. Built from `/v2/outlets`.
 class Shop {
   const Shop({
     required this.id,
+    required this.code,
     required this.name,
     required this.area,
     required this.lat,
     required this.lng,
     required this.lastVisit,
+    required this.channel,
+    this.classLabel,
+    this.openRecommendations = 0,
     this.visitedToday = false,
   });
 
+  factory Shop.fromJson(Map<String, dynamic> json) {
+    final lastVisitAt = json['last_visit_at'] == null
+        ? null
+        : DateTime.tryParse(json['last_visit_at'] as String)?.toLocal();
+    final now = DateTime.now();
+    final today = lastVisitAt != null &&
+        lastVisitAt.year == now.year &&
+        lastVisitAt.month == now.month &&
+        lastVisitAt.day == now.day;
+    return Shop(
+      id: json['id'] as String,
+      code: json['code'] as String,
+      name: json['name'] as String,
+      area: json['address'] as String? ?? json['territory'] as String? ?? '',
+      lat: (json['lat'] as num?)?.toDouble() ?? 0,
+      lng: (json['lng'] as num?)?.toDouble() ?? 0,
+      lastVisit: _relative(lastVisitAt, now),
+      channel: json['channel'] as String? ?? '',
+      classLabel: json['class_label'] as String?,
+      openRecommendations: json['open_recommendations'] as int? ?? 0,
+      visitedToday: today,
+    );
+  }
+
   final String id;
+  final String code;
   final String name;
   final String area;
   final double lat;
   final double lng;
   final String lastVisit;
+  final String channel;
+  final String? classLabel;
+  final int openRecommendations;
   final bool visitedToday;
+
+  static String _relative(DateTime? at, DateTime now) {
+    if (at == null) return 'Never';
+    final days = DateTime(now.year, now.month, now.day)
+        .difference(DateTime(at.year, at.month, at.day))
+        .inDays;
+    if (days <= 0) {
+      return 'Today, ${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}';
+    }
+    return days == 1 ? 'Yesterday' : '$days days ago';
+  }
 }
 
-abstract final class DemoData {
-  /// Simulated GPS fix. Swap for a real location stream (e.g. geolocator).
-  static const userLat = 23.79372;
-  static const userLng = 90.40660;
-
-  static const shops = [
-    Shop(
-      id: 'S-101',
-      name: 'Shwapno Banani',
-      area: 'Road 11, Banani',
-      lat: 23.79385,
-      lng: 90.40672,
-      lastVisit: '6 days ago',
-    ),
-    Shop(
-      id: 'S-102',
-      name: 'Meena Bazar Banani',
-      area: 'Kemal Ataturk Ave',
-      lat: 23.79610,
-      lng: 90.40190,
-      lastVisit: 'Today, 10:15',
-      visitedToday: true,
-    ),
-    Shop(
-      id: 'S-103',
-      name: 'Agora Superstore',
-      area: 'Block C, Banani',
-      lat: 23.79100,
-      lng: 90.41060,
-      lastVisit: '2 days ago',
-    ),
-    Shop(
-      id: 'S-104',
-      name: 'Prince Bazar',
-      area: 'Road 27, Gulshan 1',
-      lat: 23.78820,
-      lng: 90.40430,
-      lastVisit: '9 days ago',
-    ),
-    Shop(
-      id: 'S-105',
-      name: 'Nandan Departmental',
-      area: 'Road 4, Banani',
-      lat: 23.79720,
-      lng: 90.41000,
-      lastVisit: 'Never',
-    ),
-  ];
-
+/// SIMULATED position. The app does not read the device GPS yet; swap this for a
+/// real location stream (e.g. the geolocator plugin) before field use.
+abstract final class SimulatedGps {
+  static const lat = 23.79372;
+  static const lng = 90.40660;
   static const detectRadiusMeters = 60.0;
 
-  /// Nearest assigned shop within [detectRadiusMeters], else null.
-  static ({Shop shop, double meters})? detect(double lat, double lng) {
+  /// Nearest shop within [detectRadiusMeters], else null.
+  static ({Shop shop, double meters})? detect(List<Shop> shops) {
     Shop? best;
     var bestDist = double.infinity;
     for (final s in shops) {
@@ -158,32 +153,3 @@ double distanceMeters(double lat1, double lng1, double lat2, double lng2) {
       math.cos(rad(lat1)) * math.cos(rad(lat2)) * math.pow(math.sin(dLng / 2), 2);
   return 2 * r * math.asin(math.sqrt(a));
 }
-
-class ProductCategory {
-  const ProductCategory(this.name, this.active);
-  final String name;
-  final bool active;
-}
-
-const productCategories = [
-  ProductCategory('Soap', true),
-  ProductCategory('Shampoo', false),
-  ProductCategory('Toothpaste', false),
-  ProductCategory('Detergent', false),
-  ProductCategory('Dishwashing Liquid', false),
-  ProductCategory('Toilet Cleaner', false),
-];
-
-class CompanyGroup {
-  const CompanyGroup(this.name, this.brands);
-  final String name;
-  final List<String> brands;
-}
-
-const soapCompanyGroups = [
-  CompanyGroup('Square Toiletries', ['Meril', 'Sepnil']),
-  CompanyGroup('Unilever', ['Lux', 'Lifebuoy', 'Dove']),
-  CompanyGroup('Reckitt', ['Dettol']),
-  CompanyGroup('Keya Cosmetics', ['Keya']),
-  CompanyGroup('Other / Unknown', []),
-];

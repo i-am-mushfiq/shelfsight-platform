@@ -1,13 +1,38 @@
+# Render Blueprint: platform API + PostgreSQL.
+#
+# NOT YET VERIFIED ON RENDER: this file was updated together with the platform code and has
+# not been deployed. Known limits of the free plan for this workload:
+#   * the web service disk is ephemeral, so shelf photos under /tmp are lost on restart —
+#     move blobs to object storage (S3-compatible) before any real field use;
+#   * free PostgreSQL instances expire; use a paid instance for anything you need to keep;
+#   * the in-process worker runs inside the single web instance.
+databases:
+  - name: shelfsight-db
+    plan: free
+    region: singapore
+
 services:
   - type: web
     name: shelfsight-api
     runtime: python
     plan: free
     region: singapore
-    buildCommand: pip install --upgrade pip && pip install -r ai_service/requirements.txt
-    startCommand: uvicorn ai_service.app:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install --upgrade pip uv && uv sync --frozen --no-dev --extra postgres
+    startCommand: uv run --no-sync uvicorn retail_platform.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     autoDeployTrigger: 'off'
     envVars:
+      - key: SHELFSIGHT_ENV
+        value: production
+      - key: SHELFSIGHT_DATABASE_URL
+        fromDatabase:
+          name: shelfsight-db
+          property: connectionString
+      - key: SHELFSIGHT_JWT_SECRET
+        generateValue: true
+      - key: SHELFSIGHT_BLOB_DIR
+        value: /tmp/shelfsight-blobs
       - key: SHELFSIGHT_OUTPUT_DIR
         value: /tmp/shelfsight-output
+      - key: SHELFSIGHT_VISION_PROVIDER
+        value: opencv-baseline

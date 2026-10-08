@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../services/platform_api.dart';
+import '../services/upload_queue.dart';
 import '../theme/app_theme.dart';
-import '../widgets/app_widgets.dart';
 import '../widgets/shell_widgets.dart';
-import 'support_screens.dart';
+import 'detection_review_screen.dart';
+import 'outlet_screen.dart';
 
+/// Visit history from the platform. Open visits can be resumed.
 class AuditsScreen extends StatefulWidget {
   const AuditsScreen({super.key});
 
@@ -13,542 +16,193 @@ class AuditsScreen extends StatefulWidget {
 }
 
 class _AuditsScreenState extends State<AuditsScreen> {
-  String _filter = 'All';
-  final _filters = const ['All', 'Submitted', 'Review', 'Draft'];
+  List<Map<String, dynamic>>? _visits;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final visits = await PlatformApi.instance.visits();
+      if (mounted) {
+        setState(() {
+          _visits = visits;
+          _error = null;
+        });
+      }
+    } on ApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    }
+  }
+
+  Future<void> _resume(Map<String, dynamic> visit) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    try {
+      final detail = await PlatformApi.instance.visit(visit['id'] as String);
+      final captures = (detail['captures'] as List).cast<Map<String, dynamic>>();
+      final analysed = [
+        for (final c in captures)
+          if (c['status'] == 'analysed') c['id'] as String,
+      ];
+      final pending = UploadQueue.instance
+          .forVisit(visit['id'] as String)
+          .where((i) => i.state == UploadState.queued || i.state == UploadState.uploading)
+          .length;
+      if (pending > 0) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('$pending photo(s) are still waiting to upload.')),
+        );
+        UploadQueue.instance.drain();
+        return;
+      }
+      if (analysed.isEmpty) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('No analysed photos on this visit yet.')),
+        );
+        return;
+      }
+      await navigator.push(
+        MaterialPageRoute(
+          builder: (_) => DetectionReviewScreen(
+            storeName: visit['outlet_name'] as String,
+            visitId: visit['id'] as String,
+            captureIds: analysed,
+          ),
+        ),
+      );
+      if (mounted) _load();
+    } on ApiException catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final visits = _visits;
     return FixedHeaderScrollView(
       title: 'Visits',
-      subtitle: 'Your shop visit history',
+      subtitle: visits == null ? 'Loading…' : '${visits.length} recent',
       slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          sliver: SliverList.list(
-            children: [
-              const Row(
-                children: [
-                  Expanded(
-                    child: _AuditStat(
-                      label: 'THIS MONTH',
-                      value: '12',
-                      icon: Icons.assignment_turned_in_outlined,
-                    ),
-                  ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: _AuditStat(
-                      label: 'TO REVIEW',
-                      value: '3',
-                      icon: Icons.rate_review_outlined,
-                      warning: true,
-                    ),
-                  ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: _AuditStat(
-                      label: 'DRAFTS',
-                      value: '2',
-                      icon: Icons.edit_note_rounded,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              const TextField(
-                decoration: InputDecoration(
-                  prefixIcon: Icon(Icons.search_rounded),
-                  hintText: 'Search store, area, or audit ID',
-                  suffixIcon: Icon(Icons.tune_rounded),
-                ),
-              ),
-              const SizedBox(height: 14),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: _filters.map((filter) {
-                    final selected = filter == _filter;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        label: Text(filter),
-                        selected: selected,
-                        onSelected: (_) => setState(() => _filter = filter),
-                        selectedColor: AppColors.navy,
-                        labelStyle: TextStyle(
-                          color: selected ? Colors.white : AppColors.navy,
-                          fontWeight: FontWeight.w700,
+        pagePadding([
+          ListenableBuilder(
+            listenable: UploadQueue.instance,
+            builder: (context, _) {
+              final pending = UploadQueue.instance.pendingCount;
+              if (pending == 0) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: SurfaceCard(
+                  color: AppColors.amberSoft,
+                  borderColor: AppColors.amber,
+                  onTap: UploadQueue.instance.drain,
+                  child: Row(
+                    children: [
+                      const Icon(Icons.cloud_upload_outlined, color: Color(0xFF92580A)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '$pending photo(s) waiting to upload. Tap to retry now.',
+                          style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF92580A)),
                         ),
-                        showCheckmark: false,
                       ),
-                    );
-                  }).toList(),
-                ),
-              ),
-              const SizedBox(height: 22),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'September 2026',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const Text(
-                    '12 audits',
-                    style: TextStyle(color: AppColors.inkMuted, fontSize: 12),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              ..._visibleAudits.map(
-                (audit) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _AuditListCard(
-                    audit: audit,
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => AuditDetailScreen(audit: audit),
-                      ),
-                    ),
+                    ],
                   ),
                 ),
-              ),
-            ],
+              );
+            },
           ),
-        ),
+          if (_error != null)
+            SurfaceCard(
+              color: AppColors.redSoft,
+              borderColor: AppColors.red,
+              onTap: _load,
+              child: Text('$_error  Tap to retry.'),
+            )
+          else if (visits == null)
+            const Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (visits.isEmpty)
+            const SurfaceCard(
+              child: Text('No visits yet. Open a shop from Home and start a shelf audit.'),
+            )
+          else
+            for (final visit in visits)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _VisitCard(
+                  visit: visit,
+                  onTap: visit['status'] == 'open' ? () => _resume(visit) : null,
+                ),
+              ),
+        ]),
       ],
     );
   }
-
-  List<AuditPreview> get _visibleAudits {
-    if (_filter == 'All') return audits;
-    return audits.where((audit) => audit.status == _filter).toList();
-  }
 }
 
-class AuditPreview {
-  const AuditPreview({
-    required this.store,
-    required this.location,
-    required this.date,
-    required this.share,
-    required this.facings,
-    required this.status,
-    required this.id,
-  });
-  final String store;
-  final String location;
-  final String date;
-  final double share;
-  final int facings;
-  final String status;
-  final String id;
-}
+class _VisitCard extends StatelessWidget {
+  const _VisitCard({required this.visit, this.onTap});
+  final Map<String, dynamic> visit;
+  final VoidCallback? onTap;
 
-const audits = [
-  AuditPreview(
-    store: 'Shwapno Super Shop',
-    location: 'Gulshan 2, Dhaka',
-    date: 'Today • 10:15 AM',
-    share: 42.8,
-    facings: 126,
-    status: 'Submitted',
-    id: 'AUD-24091',
-  ),
-  AuditPreview(
-    store: 'Meena Bazar',
-    location: 'Dhanmondi 27, Dhaka',
-    date: 'Yesterday • 4:40 PM',
-    share: 38.1,
-    facings: 94,
-    status: 'Review',
-    id: 'AUD-24088',
-  ),
-  AuditPreview(
-    store: 'Agora Superstore',
-    location: 'Banani, Dhaka',
-    date: 'Sep 22 • 11:10 AM',
-    share: 51.4,
-    facings: 142,
-    status: 'Submitted',
-    id: 'AUD-24076',
-  ),
-  AuditPreview(
-    store: 'Prince Bazar',
-    location: 'Mirpur 1, Dhaka',
-    date: 'Sep 21 • 3:05 PM',
-    share: 0,
-    facings: 0,
-    status: 'Draft',
-    id: 'AUD-24070',
-  ),
-];
-
-class _AuditStat extends StatelessWidget {
-  const _AuditStat({
-    required this.label,
-    required this.value,
-    required this.icon,
-    this.warning = false,
-  });
-  final String label;
-  final String value;
-  final IconData icon;
-  final bool warning;
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context) {
+    final started = DateTime.parse(visit['started_at'] as String).toLocal();
+    final when =
+        '${started.day.toString().padLeft(2, '0')}/${started.month.toString().padLeft(2, '0')} '
+        '${started.hour.toString().padLeft(2, '0')}:${started.minute.toString().padLeft(2, '0')}';
+    final shares = visit['share_of_shelf'] as Map;
+    final verified = shares['verified'] as Map?;
+    final all = shares['all'] as Map?;
+    final share = verified ?? all;
+    final open = visit['status'] == 'open';
+    return SurfaceCard(
+      onTap: onTap,
+      child: Row(
         children: [
           Icon(
-            icon,
-            size: 19,
-            color: warning ? AppColors.amber : AppColors.emeraldDark,
+            open ? Icons.pending_actions_rounded : Icons.assignment_turned_in_rounded,
+            color: open ? AppColors.amber : AppColors.emeraldDark,
           ),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 23, fontWeight: FontWeight.w900),
-          ),
-          Text(
-            label,
-            maxLines: 1,
-            style: const TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w800,
-              color: AppColors.inkMuted,
-              letterSpacing: .5,
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _AuditListCard extends StatelessWidget {
-  const _AuditListCard({required this.audit, required this.onTap});
-  final AuditPreview audit;
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) {
-    final isReview = audit.status == 'Review';
-    final isDraft = audit.status == 'Draft';
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              const SizedBox(
-                width: 76,
-                height: 82,
-                child: ShelfArtwork(radius: 17),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            audit.store,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ),
-                        StatusPill(
-                          label: audit.status,
-                          color: isReview
-                              ? const Color(0xFFB45309)
-                              : isDraft
-                              ? AppColors.inkMuted
-                              : AppColors.emeraldDark,
-                          background: isReview
-                              ? const Color(0xFFFEF3C7)
-                              : isDraft
-                              ? AppColors.surfaceAlt
-                              : AppColors.mint,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      audit.location,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.inkMuted,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      audit.date,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.inkMuted,
-                      ),
-                    ),
-                    const SizedBox(height: 9),
-                    if (isDraft)
-                      const Text(
-                        'Continue audit',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.navy,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      )
-                    else
-                      Row(
-                        children: [
-                          Text(
-                            '${audit.share}%',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.emeraldDark,
-                            ),
-                          ),
-                          const Text(
-                            ' Square share',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppColors.inkMuted,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            '${audit.facings} facings',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.inkMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                  ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  visit['outlet_name'] as String,
+                  style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink),
                 ),
-              ),
-              const SizedBox(width: 4),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.inkMuted,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class AuditDetailScreen extends StatelessWidget {
-  const AuditDetailScreen({super.key, required this.audit});
-  final AuditPreview audit;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Audit details'),
-        actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.more_horiz_rounded),
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-        children: [
-          Text(audit.store, style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 5),
-          Text(
-            '${audit.location}  •  ${audit.id}',
-            style: const TextStyle(color: AppColors.inkMuted),
-          ),
-          const SizedBox(height: 18),
-          SizedBox(
-            height: 220,
-            child: InkWell(
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ShelfViewerScreen()),
-              ),
-              borderRadius: BorderRadius.circular(20),
-              child: ShelfArtwork(
-                overlay: Align(
-                  alignment: Alignment.bottomLeft,
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: StatusPill(
-                      label: audit.status,
-                      icon: Icons.check_circle_outline_rounded,
-                    ),
-                  ),
+                Text(
+                  '$when · ${visit['photos']} photo(s) · ${open ? 'open — tap to review' : 'submitted'}',
+                  style: const TextStyle(fontSize: 12.5, color: AppColors.inkMuted),
                 ),
-              ),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'SQUARE FACING SHARE',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.inkMuted,
-                            letterSpacing: .8,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '${audit.share}%',
-                          style: const TextStyle(
-                            fontSize: 38,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.emeraldDark,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(
-                    width: 86,
-                    height: 86,
-                    child: CircularProgressIndicator(
-                      value: audit.share / 100,
-                      strokeWidth: 10,
-                      backgroundColor: AppColors.surfaceAlt,
-                      color: AppColors.emerald,
-                      strokeCap: StrokeCap.round,
-                    ),
-                  ),
-                ],
-              ),
+          if (share != null)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  pct(share['value'] as num),
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: AppColors.ink),
+                ),
+                Text(
+                  verified != null ? 'verified' : 'unverified',
+                  style: const TextStyle(fontSize: 11.5, color: AppColors.inkMuted),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 16),
-          const Row(
-            children: [
-              Expanded(
-                child: _DetailMetric(label: 'Square', value: '54'),
-              ),
-              SizedBox(width: 10),
-              Expanded(
-                child: _DetailMetric(label: 'Other', value: '65'),
-              ),
-              SizedBox(width: 10),
-              Expanded(
-                child: _DetailMetric(label: 'Corrected', value: '7'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 22),
-          const SectionTitle(title: 'Visit information'),
-          const SizedBox(height: 10),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                children: [
-                  _InfoRow(
-                    icon: Icons.schedule_rounded,
-                    label: 'Captured',
-                    value: audit.date,
-                  ),
-                  const Divider(height: 26),
-                  const _InfoRow(
-                    icon: Icons.photo_library_outlined,
-                    label: 'Photos',
-                    value: '3 shelf sections',
-                  ),
-                  const Divider(height: 26),
-                  const _InfoRow(
-                    icon: Icons.location_on_outlined,
-                    label: 'GPS',
-                    value: 'Verified • ±8 m',
-                  ),
-                  const Divider(height: 26),
-                  const _InfoRow(
-                    icon: Icons.category_outlined,
-                    label: 'Category',
-                    value: 'Food & Beverage',
-                  ),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
-}
-
-class _DetailMetric extends StatelessWidget {
-  const _DetailMetric({required this.label, required this.value});
-  final String label;
-  final String value;
-  @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.symmetric(vertical: 15),
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 11, color: AppColors.inkMuted),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-  final IconData icon;
-  final String label;
-  final String value;
-  @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Icon(icon, size: 20, color: AppColors.inkMuted),
-      const SizedBox(width: 12),
-      Text(label, style: const TextStyle(color: AppColors.inkMuted)),
-      const Spacer(),
-      Flexible(
-        child: Text(
-          value,
-          textAlign: TextAlign.right,
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-      ),
-    ],
-  );
 }

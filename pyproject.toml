@@ -1,0 +1,31 @@
+[project]
+name = "shelfsight-platform"
+version = "0.2.0"
+description = "ShelfSight retail intelligence platform: API, domain services and AI orchestration."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi==0.141.1",
+    "uvicorn[standard]==0.53.0",
+    "pydantic==2.13.5",
+    "python-multipart==0.0.32",
+    "sqlalchemy>=2.0.36,<2.1",
+    "alembic>=1.14,<2",
+    "pyjwt>=2.10,<3",
+    "prometheus-client>=0.21,<1",
+    "numpy==2.5.3",
+    "opencv-python-headless==5.0.0.93",
+    "httpx==0.28.1",
+]
+
+[project.optional-dependencies]
+postgres = ["psycopg[binary]>=3.2,<4"]
+llm = ["anthropic>=0.70"]
+
+[dependency-groups]
+dev = ["pytest==9.1.1"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["retail_platform/tests", "ai_service/tests"]

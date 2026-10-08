@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/session.dart';
+import '../services/platform_api.dart';
+import '../services/upload_queue.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_widgets.dart';
 import '../widgets/onboarding_widgets.dart';
@@ -43,16 +47,22 @@ class _LoginScreenState extends State<LoginScreen> {
       _busy = true;
       _error = null;
     });
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-    if (!mounted) return;
-    final user = DemoAuth.signIn(_idController.text, _passController.text);
-    if (user == null) {
+    final UserSession user;
+    try {
+      user = UserSession.fromAuth(
+        await PlatformApi.instance.login(_idController.text, _passController.text),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = 'Employee ID or password is incorrect';
+        _error = error.message;
       });
       return;
     }
+    if (!mounted) return;
+    // Photos captured offline in an earlier session can upload now.
+    unawaited(UploadQueue.instance.drain());
     LoginScreen.rememberedId = _remember ? user.employeeId : null;
     currentSession.value = user;
     Navigator.of(context).pushReplacement(
@@ -85,8 +95,8 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 14),
               const StatusPill(
-                label: 'Demo: SO-1001 · shelf123',
-                icon: Icons.info_outline_rounded,
+                label: 'Server: ${PlatformApi.baseUrl}',
+                icon: Icons.dns_outlined,
               ),
             ],
           ),
