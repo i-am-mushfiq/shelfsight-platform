@@ -7,6 +7,8 @@ import 'package:image_picker/image_picker.dart';
 import '../models/field_models.dart';
 import '../services/platform_api.dart';
 import '../theme/app_theme.dart';
+import '../recognition/on_device.dart';
+import '../widgets/screen_photo_toggle.dart';
 import 'live_scan_screen.dart';
 import 'review_screen.dart';
 import 'sphere_capture_screen.dart';
@@ -170,7 +172,7 @@ class _CaptureScreenState extends State<CaptureScreen>
 
   Future<void> _liveScan() async {
     final kept = await _withCameraReleased<List<String>>(MaterialPageRoute(
-      builder: (_) => LiveScanScreen(storeName: widget.storeName, categoryId: _rackId),
+      builder: (_) => LiveScanScreen(storeName: widget.storeName, categoryId: _rackId, onDevice: OnDeviceRecognizer.enabled),
     ));
     if (kept != null && kept.isNotEmpty && mounted) setState(() => _photos.addAll(kept.map(_photo)));
   }
@@ -280,6 +282,7 @@ class _CaptureScreenState extends State<CaptureScreen>
           ],
         ),
         actions: [
+          if (PlatformApi.offline) const ScreenPhotoToggle(),
           IconButton(
             tooltip: _flash ? 'Flash on' : 'Flash off',
             onPressed: _toggleFlash,

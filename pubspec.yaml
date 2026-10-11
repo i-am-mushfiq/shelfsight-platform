@@ -43,9 +43,12 @@ dependencies:
   path_provider: ^2.1.6
   sensors_plus: ^7.1.1
   panorama_viewer: ^2.0.7
+  flutter_onnxruntime: 1.8.5
 
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  integration_test:
     sdk: flutter
   flutter_launcher_icons: ^0.14.4
   flutter_native_splash: 2.4.7
@@ -70,6 +73,10 @@ flutter:
 
   assets:
     - assets/branding/shelfsight-logo.png
+    # On-device recognition bundle (tools/build_on_device_models.py).
+    - assets/recognition/
+    # Demo data for running with no server (tools/export_offline_demo.py).
+    - assets/demo/
 
   # Poppins (SIL Open Font License, see assets/fonts/OFL.txt). Bundled so the
   # app renders the same offline as online.

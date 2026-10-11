@@ -410,6 +410,8 @@ class VisualLookupProvider:
             ours = _sigmoid((similarity - accept_similarity) / 0.02) * min(1.0, colour / (accept_colour + 0.06))
             evidence = {"similarity": round(similarity, 3), "colour": round(float(colour), 3),
                         "detector": round(detector_score, 3),
+                        "brand_read": read.brand if read is not None else None,
+                        "brand_read_probability": round(read_p, 3), "brand_read_competitor": competitor is not None,
                         "alternatives": [{"product_id": p, "similarity": round(v, 3)} for p, (v, _) in ranked[:3]]}
             if similarity >= accept_similarity and colour >= accept_colour:
                 # How clearly the best product beats its siblings (softmax over the top five).

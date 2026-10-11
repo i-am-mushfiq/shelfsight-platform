@@ -196,6 +196,31 @@ without a readable English brand name can pass as Square. The thresholds were tu
 images and the screen photos are simulated, so treat the numbers as a demo setting, not a field
 accuracy; real phone photos of a screen have not been measured yet.
 
+## Demo without a server: everything on the phone
+
+A build without `SHELFSIGHT_API_URL` needs no server, laptop or internet. The sign-in screen
+shows "Server: On this phone (no server)"; "Change" switches to a laptop server and back.
+
+* **Demo data**: users, shops, order history, shop intelligence, briefs, catalogue, store types,
+  must-stock lists and shelf rules are a snapshot of the demo server (`assets/demo/snapshot.json`).
+  To refresh it after changing the seed or the catalogue, run
+  `uv run python tools/export_offline_demo.py`.
+* **What happens in a demo** (shops registered, visits, photos, reviews, orders, recommendation
+  decisions) is kept on the phone and survives restarts. Profile → "Reset demo data" clears it.
+* **Recognition** of shelf photos, 360° spheres and Live scan runs on the phone with published
+  models (`assets/recognition/`, built by `tools/build_on_device_models.py`). Sphere frames are
+  placed side by side (not stitched) and each frame is recognised on its own.
+* **Reports, share of shelf, placement checks, automatic orders, recommendations and the
+  supervisor dashboards** are worked out on the phone with the server's rules
+  (`lib/offline/field_logic.dart`). `test/offline_backend_test.dart` checks that shop
+  intelligence, briefs, suggested orders and dashboards match the server's answers exactly.
+* The camera screens have a screen/real-shelf switch (monitor icon): on for photos of shelf
+  images on a screen (the default), off for real shelves.
+
+What stays approximate without a server: a shop's history-based recommendations are the
+snapshot's (they do not change when its store type is changed during a visit), and a shop
+registered on the phone starts from a template for its store type.
+
 ## Vision model status
 
 Four recognisers ship. **`visual-lookup`** and **`packshot-match`** (described above) need no

@@ -10,6 +10,7 @@ import '../services/upload_queue.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_widgets.dart';
 import '../widgets/onboarding_widgets.dart';
+import 'live_scan_screen.dart';
 import 'location_permission_screen.dart';
 
 /// Onboarding 2/4 (and 3/4: the same screen in its error state).
@@ -106,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 14),
               StatusPill(
-                label: 'Server: ${PlatformApi.baseUrl}',
+                label: 'Server: ${PlatformApi.serverLabel}',
                 icon: Icons.dns_outlined,
               ),
             ],
@@ -294,6 +295,21 @@ class _LoginScreenState extends State<LoginScreen> {
                                 : Icons.arrow_forward_rounded,
                             onPressed: _busy ? null : _submit,
                           ),
+                          const SizedBox(height: 10),
+                          // Demo without a server: recognition runs on this phone.
+                          OutlinedButton.icon(
+                            key: const Key('try-live-scan'),
+                            onPressed: _busy
+                                ? null
+                                : () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const LiveScanScreen(storeName: 'Demo', onDevice: true),
+                                    ),
+                                  ),
+                            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+                            icon: const Icon(Icons.center_focus_strong_outlined),
+                            label: Text(t('Try Live scan on this phone')),
+                          ),
                           const SizedBox(height: 6),
                           Center(
                             child: TextButton(
@@ -321,7 +337,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               icon: const Icon(Icons.dns_outlined, size: 18),
                               label: Text(
-                                'Server: ${Uri.tryParse(PlatformApi.baseUrl)?.authority ?? PlatformApi.baseUrl} · Change',
+                                'Server: ${PlatformApi.serverLabel} · Change',
                                 style: const TextStyle(fontWeight: FontWeight.w600, fontSize: AppFontSize.md),
                               ),
                             ),
@@ -332,13 +348,15 @@ class _LoginScreenState extends State<LoginScreen> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  Icons.lock_rounded,
+                                  PlatformApi.offline ? Icons.phone_android_rounded : Icons.lock_rounded,
                                   size: 15,
                                   color: AppColors.inkMuted,
                                 ),
                                 SizedBox(width: 6),
                                 Text(
-                                  t('Secure, encrypted connection'),
+                                  PlatformApi.offline
+                                      ? t('Works without a server or internet')
+                                      : t('Secure, encrypted connection'),
                                   style: TextStyle(
                                     fontSize: AppFontSize.md,
                                     color: AppColors.inkMuted,
@@ -440,7 +458,7 @@ class _ServerAddressDialogState extends State<ServerAddressDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          t('For a demo, enter the laptop IP on the same Wi-Fi, e.g. 192.168.0.103 (http:// and port 8000 are added).'),
+          t('For a demo without a server, choose On this phone: everything, including recognition, runs on the phone. To use a laptop server, enter its IP on the same Wi-Fi, e.g. 192.168.0.103 (http:// and port 8000 are added).'),
           style: TextStyle(height: 1.4),
         ),
         const SizedBox(height: 12),
@@ -464,8 +482,12 @@ class _ServerAddressDialogState extends State<ServerAddressDialog> {
     ),
     actions: [
       TextButton(
-        onPressed: () => _controller.text = PlatformApi.defaultBaseUrl,
-        child: Text(t('Default')),
+        key: const Key('server-on-phone'),
+        onPressed: () => setState(() {
+          _controller.text = PlatformApi.offlineBaseUrl;
+          _result = null;
+        }),
+        child: Text(t('On this phone')),
       ),
       TextButton(
         onPressed: _testing ? null : _test,

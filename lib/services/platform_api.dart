@@ -9,6 +9,7 @@ import 'package:http_parser/http_parser.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../l10n/l10n.dart';
+import '../offline/offline_backend.dart';
 
 /// Thrown for any failed platform call. [retryable] is true for network
 /// failures and 5xx/429, which the upload queue retries later.
@@ -53,16 +54,23 @@ class PlatformApi {
   PlatformApi._();
   static final PlatformApi instance = PlatformApi._();
 
-  /// The address the app was built with; the server address field on the sign-in screen
-  /// overrides it (saved on the phone), so a demo laptop's IP needs no rebuild.
-  static const String defaultBaseUrl = String.fromEnvironment(
-    'SHELFSIGHT_API_URL',
-    defaultValue: 'https://shelfsight-api-lqqn.onrender.com',
-  );
+  /// "Server" address meaning: no server, everything runs on this phone ([OfflineBackend]).
+  static const String offlineBaseUrl = 'http://on-this-phone';
+
+  /// The address the app was built with (on this phone, unless built with
+  /// SHELFSIGHT_API_URL); the server address field on the sign-in screen overrides it
+  /// (saved on the phone), so a demo laptop's IP needs no rebuild.
+  static const String defaultBaseUrl = String.fromEnvironment('SHELFSIGHT_API_URL', defaultValue: offlineBaseUrl);
   static String baseUrl = defaultBaseUrl;
 
+  /// True when the app works without a server.
+  static bool get offline => baseUrl == offlineBaseUrl;
+
+  /// How the sign-in screen names where the app gets its data.
+  static String get serverLabel => offline ? 'On this phone (no server)' : Uri.tryParse(baseUrl)?.authority ?? baseUrl;
+
   static Future<File> _serverFile() async =>
-      File('${(await getApplicationDocumentsDirectory()).path}/server_address.txt');
+      File('${(await getApplicationDocumentsDirectory()).path}/server_address_v2.txt');
 
   /// Restores a saved server address. Called once at start-up.
   static Future<void> loadServerAddress() async {
@@ -85,6 +93,10 @@ class PlatformApi {
       value = value.substring(0, value.length - 1);
     }
     if (value.isEmpty) return defaultBaseUrl;
+    if (const {'phone', 'offline', 'on this phone', 'on-this-phone', 'none', 'no server'}.contains(value.toLowerCase()) ||
+        value == offlineBaseUrl) {
+      return offlineBaseUrl;
+    }
     if (!value.contains('://')) {
       value = 'http://$value';
       final uri = Uri.tryParse(value);
@@ -117,6 +129,7 @@ class PlatformApi {
   /// Reachability check for the server address field.
   Future<String> ping(String address) async {
     final value = normalizeServerAddress(address);
+    if (value == offlineBaseUrl) return 'Everything runs on this phone: no server needed.';
     final body = await _send(
       () => _client.get(Uri.parse('$value/health'), headers: const {'Accept': 'application/json'}),
       timeout: const Duration(seconds: 8),
@@ -125,12 +138,16 @@ class PlatformApi {
     return provider == null ? 'Server reachable' : 'Server reachable · recognition: $provider';
   }
 
-  http.Client _client = http.Client();
+  late final http.Client _network = http.Client();
+  http.Client? _override;
   String? _token;
+
+  /// The network, or the in-app server when there is none.
+  http.Client get _client => _override ?? (offline ? OfflineBackend.instance : _network);
 
   /// Tests replace the transport with a fake; production code never calls this.
   @visibleForTesting
-  set httpClient(http.Client client) => _client = client;
+  set httpClient(http.Client client) => _override = client;
 
   bool get signedIn => _token != null;
   void signOut() => _token = null;

@@ -162,7 +162,7 @@ class _SphereViewerScreenState extends State<SphereViewerScreen> {
                   ),
                   Text(
                     '${sphere['frames']} photos · ${(sphere['horizontal_degrees'] as num? ?? 0).round()}° wide'
-                    '${sphere['stitched'] == false ? ' · placed side by side (could not stitch)' : ''}',
+                    '${sphere['stitched'] == false ? (PlatformApi.offline ? ' · placed side by side' : ' · placed side by side (could not stitch)') : ''}',
                     style: const TextStyle(color: Colors.white60, fontSize: AppFontSize.sm),
                   ),
                   const SizedBox(height: 10),

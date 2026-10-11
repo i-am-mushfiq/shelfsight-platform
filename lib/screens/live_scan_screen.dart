@@ -4,17 +4,22 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
 import '../l10n/l10n.dart';
+import '../recognition/on_device.dart';
 
 import '../services/platform_api.dart';
 import '../theme/app_theme.dart';
+import '../widgets/screen_photo_toggle.dart';
 
 /// Live viewfinder: frames go to the platform, which looks each one up against the catalogue
 /// pack shots and answers with the products it found, where, and how sure it is. Nothing is
 /// stored until the officer keeps a frame; kept frames are returned as photo paths.
 class LiveScanScreen extends StatefulWidget {
-  const LiveScanScreen({super.key, required this.storeName, this.categoryId});
+  const LiveScanScreen({super.key, required this.storeName, this.categoryId, this.onDevice = false});
   final String storeName;
   final String? categoryId;
+
+  /// Recognise on this phone (bundled models) instead of sending frames to the server.
+  final bool onDevice;
 
   @override
   State<LiveScanScreen> createState() => _LiveScanScreenState();
@@ -30,6 +35,7 @@ class _LiveScanScreenState extends State<LiveScanScreen> with WidgetsBindingObse
   String? _lastPath;
   int? _roundTripMs;
   final List<String> _kept = [];
+  // Photographing a demo shelf on a monitor: thresholds suited to screen photos.
 
   @override
   void initState() {
@@ -90,7 +96,13 @@ class _LiveScanScreenState extends State<LiveScanScreen> with WidgetsBindingObse
     final watch = Stopwatch()..start();
     try {
       final frame = await controller.takePicture();
-      final result = await PlatformApi.instance.liveDetect(frame.path, categoryId: widget.categoryId);
+      // With no server, a signed-in scan goes through the in-app server, which recognises on
+      // the phone too and keeps to the rack's category as the server would.
+      final viaApp = PlatformApi.offline && PlatformApi.instance.signedIn;
+      final result = widget.onDevice && !viaApp
+          ? await OnDeviceRecognizer.instance.recognize(await File(frame.path).readAsBytes(),
+              screenPhoto: OnDeviceRecognizer.screenPhotos.value, maxPacks: 16)
+          : await PlatformApi.instance.liveDetect(frame.path, categoryId: widget.categoryId);
       if (!mounted) return;
       final previous = _lastPath;
       setState(() {
@@ -105,6 +117,10 @@ class _LiveScanScreenState extends State<LiveScanScreen> with WidgetsBindingObse
       await Future<void>.delayed(const Duration(seconds: 1));
     } on CameraException {
       await Future<void>.delayed(const Duration(milliseconds: 300));
+    } catch (error) {
+      // On-device recognition failed (e.g. models not bundled): say so and keep trying.
+      if (mounted) setState(() => _networkError = 'Recognition failed on this phone');
+      await Future<void>.delayed(const Duration(seconds: 1));
     }
   }
 
@@ -159,6 +175,7 @@ class _LiveScanScreenState extends State<LiveScanScreen> with WidgetsBindingObse
           ],
         ),
         actions: [
+          if (widget.onDevice || PlatformApi.offline) const ScreenPhotoToggle(),
           IconButton(
             tooltip: _running ? 'Pause' : 'Resume',
             onPressed: _controller == null ? null : _togglePause,
@@ -186,7 +203,9 @@ class _LiveScanScreenState extends State<LiveScanScreen> with WidgetsBindingObse
                           running: _running,
                           text: _networkError ??
                               (_roundTripMs == null
-                                  ? 'Starting…'
+                                  ? (widget.onDevice ? 'Loading models…' : 'Starting…')
+                                  : widget.onDevice
+                                  ? 'On this phone · ${(_roundTripMs! / 1000).toStringAsFixed(1)} s'
                                   : 'Scanning'),
                           error: _networkError != null,
                         ),

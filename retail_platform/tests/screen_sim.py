@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 
 
-def photograph_screen(img: np.ndarray, rng: np.random.Generator, kind: str = "lcd") -> np.ndarray:
+def photograph_screen(img: np.ndarray, rng: np.random.Generator, kind: str = "lcd", with_map: bool = False):
     h, w = img.shape[:2]
     scale = 3
     # Screen: each image pixel becomes a 3x3 block of R, G, B subpixel columns (LCD) or a
@@ -59,6 +59,16 @@ def photograph_screen(img: np.ndarray, rng: np.random.Generator, kind: str = "lc
         kernel[k // 2, :] = 1 / k
         photo = cv2.filter2D(photo, -1, kernel)  # slight hand shake
     ok, jpg = cv2.imencode(".jpg", photo, [cv2.IMWRITE_JPEG_QUALITY, 75])
-    return cv2.imdecode(jpg, cv2.IMREAD_COLOR)
+    result = cv2.imdecode(jpg, cv2.IMREAD_COLOR)
+    if not with_map:
+        return result
+
+    def to_photo(points: np.ndarray) -> np.ndarray:
+        """Normalised (x, y) points in the source image -> normalised points in the photo."""
+        canvas = np.float32([[x * sw + ox, y * sh + oy] for x, y in points]).reshape(-1, 1, 2)
+        warped = cv2.perspectiveTransform(canvas, homography.astype(np.float64)).reshape(-1, 2)
+        return warped / [canvas_w, canvas_h]
+
+    return result, to_photo
 
 

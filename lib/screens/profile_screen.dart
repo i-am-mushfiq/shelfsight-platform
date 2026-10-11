@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../l10n/l10n.dart';
 
 import '../models/session.dart';
+import '../offline/offline_backend.dart';
 import '../services/platform_api.dart';
 import '../theme/app_theme.dart';
 import 'login_screen.dart';
@@ -243,6 +244,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                     ),
+                    if (PlatformApi.offline) ...[
+                      const Divider(height: 1, indent: 56),
+                      _SettingsRow(
+                        key: const Key('reset-demo'),
+                        icon: Icons.restart_alt_rounded,
+                        title: t('Reset demo data'),
+                        trailing: t('On this phone'),
+                        onTap: _resetDemo,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -284,6 +295,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+
+  /// Without a server the demo's visits, photos, orders and new shops live on this phone;
+  /// this clears them so the next demo starts from the shipped data.
+  Future<void> _resetDemo() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(t('Reset demo data?')),
+        content: Text(t('Visits, photos, orders, decisions and shops added on this phone are deleted. Shops and their history come back as shipped.')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(t('Cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(t('Reset'))),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await OfflineBackend.instance.reset();
+    messenger.showSnackBar(SnackBar(content: Text(t('Demo data reset'))));
+  }
   void _showLanguagePicker() {
     showModalBottomSheet<void>(
       context: context,
@@ -361,6 +392,7 @@ class _SettingHeader extends StatelessWidget {
 
 class _SettingsRow extends StatelessWidget {
   const _SettingsRow({
+    super.key,
     required this.icon,
     required this.title,
     this.trailing,
