@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -28,10 +29,14 @@ class DetectionReviewScreen extends StatefulWidget {
     required this.storeName,
     required this.visitId,
     required this.captureIds,
+    this.followQueue = false,
   });
   final String storeName;
   final String visitId;
   final List<String> captureIds;
+
+  /// Also shows the visit's photos still being read, adding each one as soon as it is ready.
+  final bool followQueue;
 
   @override
   State<DetectionReviewScreen> createState() => _DetectionReviewScreenState();
@@ -40,6 +45,10 @@ class DetectionReviewScreen extends StatefulWidget {
 class _DetectionReviewScreenState extends State<DetectionReviewScreen> {
   final _api = PlatformApi.instance;
   int _photo = 0;
+  late final List<String> _ids = [];
+  final Set<String> _waiting = {}; // capture ids (or queue ids) not read yet
+  int _unreadable = 0;
+  Timer? _poll;
   final Map<String, Map<String, dynamic>> _captures = {};
   final Map<String, Uint8List> _images = {};
   List<Map<String, dynamic>> _products = const [];
@@ -48,7 +57,7 @@ class _DetectionReviewScreenState extends State<DetectionReviewScreen> {
   String? _error;
   bool _busy = false;
 
-  String get _captureId => widget.captureIds[_photo];
+  String? get _captureId => _ids.isEmpty ? null : _ids[_photo];
   Map<String, dynamic>? get _capture => _captures[_captureId];
   List<Map<String, dynamic>> get _detections =>
       ((_capture?['detections'] as List?) ?? const []).cast<Map<String, dynamic>>();
@@ -57,27 +66,86 @@ class _DetectionReviewScreenState extends State<DetectionReviewScreen> {
   @override
   void initState() {
     super.initState();
+    _waiting.addAll(widget.captureIds);
     _loadAll();
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadAll() async {
     setState(() => _error = null);
     try {
       _products = await _api.products();
-      for (final id in widget.captureIds) {
-        _captures[id] = await _api.capture(id);
-        if (mounted) setState(() {});
-      }
-      await _loadImage();
-      _selectNext();
+      await _gather();
+      _poll ??= Timer.periodic(const Duration(milliseconds: 1200), (_) => _gather());
     } on ApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
     }
   }
 
+  bool _gathering = false;
+
+  /// Picks up photos as they finish reading. The first one ready opens straight away.
+  Future<void> _gather() async {
+    if (_gathering) return;
+    _gathering = true;
+    try {
+      final candidates = <String>[..._waiting.where((id) => !id.startsWith('queue:'))];
+      _waiting.removeWhere((id) => id.startsWith('queue:'));
+      if (widget.followQueue) {
+        final queue = UploadQueue.instance;
+        unawaited(queue.drain());
+        var unreadable = 0;
+        for (final item in queue.forVisit(widget.visitId)) {
+          if (item.state == UploadState.rejected || item.duplicateOf != null) {
+            unreadable++;
+          } else if (item.captureId == null) {
+            _waiting.add('queue:${item.clientCaptureId}');
+          } else if (!_ids.contains(item.captureId) && !candidates.contains(item.captureId)) {
+            candidates.add(item.captureId!);
+          }
+        }
+        _unreadable = unreadable;
+      }
+      for (final id in candidates) {
+        if (_ids.contains(id)) continue;
+        try {
+          final capture = await _api.capture(id);
+          final status = capture['status'];
+          if (status == 'analysed') {
+            _waiting.remove(id);
+            _captures[id] = capture;
+            _ids.add(id);
+          } else if (status == 'failed') {
+            _waiting.remove(id);
+            _unreadable++;
+          } else {
+            _waiting.add(id);
+          }
+        } on ApiException {
+          _waiting.add(id); // next tick
+        }
+      }
+      // Photos taken just before Next may still be joining the queue, so keep following it.
+      if (_waiting.isEmpty && !widget.followQueue) _poll?.cancel();
+      if (!mounted) return;
+      setState(() {});
+      if (_ids.isNotEmpty && _images.isEmpty) {
+        await _loadImage();
+        _selectNext();
+      }
+    } finally {
+      _gathering = false;
+    }
+  }
+
   Future<void> _loadImage() async {
     final id = _captureId;
-    if (_images.containsKey(id)) return;
+    if (id == null || _images.containsKey(id)) return;
     try {
       final bytes = await _api.imageBytes('/v2/captures/$id/image');
       if (mounted) setState(() => _images[id] = bytes);
@@ -180,10 +248,10 @@ class _DetectionReviewScreenState extends State<DetectionReviewScreen> {
   List<Map<String, dynamic>> get _pending => _detections.where((d) => d['needs_review'] == true).toList();
 
   int? get _nextPhotoWithWork {
-    for (var i = 1; i <= widget.captureIds.length; i++) {
-      final index = (_photo + i) % widget.captureIds.length;
+    for (var i = 1; i <= _ids.length; i++) {
+      final index = (_photo + i) % _ids.length;
       if (index == _photo) break;
-      final detections = ((_captures[widget.captureIds[index]]?['detections'] as List?) ?? const [])
+      final detections = ((_captures[_ids[index]]?['detections'] as List?) ?? const [])
           .cast<Map<String, dynamic>>();
       if (detections.any((d) => d['needs_review'] == true)) return index;
     }
@@ -211,6 +279,7 @@ class _DetectionReviewScreenState extends State<DetectionReviewScreen> {
   Widget build(BuildContext context) {
     final capture = _capture;
     final image = _images[_captureId];
+    final reading = _waiting.length;
     final current = _current;
     final pending = _pending;
     final position = current == null ? 0 : pending.indexWhere((d) => d['id'] == current['id']) + 1;
@@ -224,8 +293,10 @@ class _DetectionReviewScreenState extends State<DetectionReviewScreen> {
             Text(t('Check the results')),
             Text(
               [
-                if (widget.captureIds.length > 1) 'Photo ${_photo + 1} of ${widget.captureIds.length}',
-                pending.isEmpty ? 'All checked' : '${pending.length} to check',
+                if (_ids.length > 1) 'Photo ${_photo + 1} of ${_ids.length}',
+                if (reading > 0) 'reading $reading more…'
+                else if (pending.isEmpty) 'All checked'
+                else '${pending.length} to check',
               ].join(' · '),
               style: const TextStyle(fontSize: AppFontSize.sm, color: AppColors.inkMuted, fontWeight: FontWeight.w500),
             ),
@@ -238,7 +309,7 @@ class _DetectionReviewScreenState extends State<DetectionReviewScreen> {
           child: PrimaryButton(
             label: _busy ? 'Please wait…' : 'Finish visit',
             icon: Icons.flag_outlined,
-            onPressed: _busy || capture == null ? null : _submit,
+            onPressed: _busy || capture == null || reading > 0 ? null : _submit,
           ),
         ),
       ),
@@ -257,10 +328,25 @@ class _DetectionReviewScreenState extends State<DetectionReviewScreen> {
               ),
             )
           : capture == null || image == null
-          ? const Center(child: CircularProgressIndicator())
+          ? _Reading(waiting: reading, unreadable: _unreadable)
           : ListView(
               padding: const EdgeInsets.fromLTRB(AppSpace.page, 4, AppSpace.page, AppSpace.xl),
               children: [
+                if (reading > 0) ...[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                    child: const LinearProgressIndicator(minHeight: 3),
+                  ),
+                  const SizedBox(height: AppSpace.sm),
+                ],
+                if (_unreadable > 0 && reading == 0)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpace.sm),
+                    child: Text(
+                      '$_unreadable photo(s) skipped (repeated or unreadable).',
+                      style: const TextStyle(fontSize: AppFontSize.sm, color: AppColors.inkMuted),
+                    ),
+                  ),
                 if (current != null) ...[
                   _PackZoom(image: image, capture: capture, detection: current),
                   const SizedBox(height: AppSpace.lg),
@@ -675,4 +761,32 @@ class _ProductPickerState extends State<_ProductPicker> {
       ),
     );
   }
+}
+
+/// Shown only until the first photo is ready, which is usually immediate.
+class _Reading extends StatelessWidget {
+  const _Reading({required this.waiting, required this.unreadable});
+  final int waiting;
+  final int unreadable;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (waiting > 0 || unreadable == 0) const CircularProgressIndicator(),
+          const SizedBox(height: 16),
+          Text(
+            waiting > 0 || unreadable == 0
+                ? t('Reading the shelf…')
+                : t('No photo could be read. Go back and take another.'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: AppColors.inkMuted, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    ),
+  );
 }

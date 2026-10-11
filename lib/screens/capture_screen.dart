@@ -8,9 +8,10 @@ import '../models/field_models.dart';
 import '../services/platform_api.dart';
 import '../theme/app_theme.dart';
 import '../recognition/on_device.dart';
+import '../services/upload_queue.dart';
 import '../widgets/screen_photo_toggle.dart';
+import 'detection_review_screen.dart';
 import 'live_scan_screen.dart';
-import 'review_screen.dart';
 import 'sphere_capture_screen.dart';
 
 /// Step 2 of the visit: photograph the racks. Each photo remembers which rack it
@@ -137,7 +138,7 @@ class _CaptureScreenState extends State<CaptureScreen>
     setState(() => _capturing = true);
     try {
       final photo = await controller.takePicture();
-      if (mounted) setState(() => _photos.add(_photo(photo.path)));
+      if (mounted) _add([photo.path]);
     } on CameraException {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -156,7 +157,7 @@ class _CaptureScreenState extends State<CaptureScreen>
       maxWidth: 2400,
     );
     if (photos.isNotEmpty && mounted) {
-      setState(() => _photos.addAll(photos.map((photo) => _photo(photo.path))));
+      _add([for (final photo in photos) photo.path]);
     }
   }
 
@@ -174,7 +175,7 @@ class _CaptureScreenState extends State<CaptureScreen>
     final kept = await _withCameraReleased<List<String>>(MaterialPageRoute(
       builder: (_) => LiveScanScreen(storeName: widget.storeName, categoryId: _rackId, onDevice: OnDeviceRecognizer.enabled),
     ));
-    if (kept != null && kept.isNotEmpty && mounted) setState(() => _photos.addAll(kept.map(_photo)));
+    if (kept != null && kept.isNotEmpty && mounted) _add(kept);
   }
 
   Future<void> _sphere() async {
@@ -188,6 +189,21 @@ class _CaptureScreenState extends State<CaptureScreen>
 
   CapturedPhoto _photo(String path) =>
       CapturedPhoto(path: path, categoryId: _rackId, categoryName: _rackName);
+
+  /// Keeps the photos and starts reading them straight away, so results are
+  /// ready (or nearly) by the time the officer taps Next.
+  void _add(List<String> paths) {
+    final photos = paths.map(_photo).toList();
+    setState(() => _photos.addAll(photos));
+    for (final photo in photos) {
+      UploadQueue.instance.enqueue(
+        visitId: widget.visitId,
+        sourcePath: photo.path,
+        area: photo.categoryName,
+        categoryId: photo.categoryId,
+      );
+    }
+  }
 
   /// Which rack the next photos show. Optional: a mixed rack is identified product by product.
   Future<void> _pickRack() async {
@@ -253,12 +269,11 @@ class _CaptureScreenState extends State<CaptureScreen>
 
   void _review() => Navigator.of(context).push(
     MaterialPageRoute(
-      builder: (_) => ReviewScreen(
+      builder: (_) => DetectionReviewScreen(
         storeName: widget.storeName,
-        storeTypeName: widget.storeTypeName,
         visitId: widget.visitId,
-        photos: List.unmodifiable(_photos),
-        spheres: List.unmodifiable(_spheres),
+        captureIds: [for (final s in _spheres) s['id'] as String],
+        followQueue: true,
       ),
     ),
   );
