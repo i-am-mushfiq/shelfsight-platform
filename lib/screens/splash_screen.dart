@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
+
 import '../theme/app_theme.dart';
 import '../widgets/onboarding_widgets.dart';
 import 'login_screen.dart';
@@ -72,26 +74,26 @@ class _SplashScreenState extends State<SplashScreen> {
                         child: child,
                       ),
                     ),
-                    child: const Column(
+                    child: Column(
                       children: [
                         BrandMark(size: 120, glow: true),
                         SizedBox(height: 28),
                         Text(
-                          'ShelfSight',
+                          t('ShelfSight'),
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 34,
+                            fontSize: AppFontSize.display,
                             height: 1,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w600,
                             letterSpacing: -1,
                           ),
                         ),
                         SizedBox(height: 12),
                         Text(
-                          'Retail visibility, measured',
+                          t('Retail visibility, measured'),
                           style: TextStyle(
                             color: Color(0xFFB6C2D4),
-                            fontSize: 16,
+                            fontSize: AppFontSize.lg,
                             letterSpacing: .2,
                           ),
                         ),

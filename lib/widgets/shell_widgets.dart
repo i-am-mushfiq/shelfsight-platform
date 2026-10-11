@@ -1,12 +1,11 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
+
+import '../l10n/l10n.dart';
 
 import '../screens/support_screens.dart';
 import '../theme/app_theme.dart';
-import 'app_widgets.dart';
 
-/// Fixed glass header: logo, title (+ optional subtitle), bell. Never scrolls.
+/// Fixed header: title (+ optional subtitle) and notifications. Never scrolls.
 class ShelfSightHeader extends StatelessWidget {
   const ShelfSightHeader({
     super.key,
@@ -16,7 +15,7 @@ class ShelfSightHeader extends StatelessWidget {
     this.alertCount = 0,
   });
 
-  static const double height = 68;
+  static const double height = 60;
 
   final String title;
   final String? subtitle;
@@ -30,80 +29,52 @@ class ShelfSightHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final top = MediaQuery.paddingOf(context).top;
-    return GlassSurface(
-      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(22)),
-      color: Colors.white.withValues(alpha: .72),
-      borderColor: Colors.white.withValues(alpha: .8),
-      blur: 22,
+    return ColoredBox(
+      color: AppColors.headerSurface,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(16, top + 8, 12, 8),
+        padding: EdgeInsets.fromLTRB(20, top, 8, 0),
         child: SizedBox(
-          height: height - 16,
+          height: height,
           child: Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.navy,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: Image.asset(
-                    'assets/branding/shelfsight-logo.png',
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
               Expanded(
-                child: SizedBox(
-                  height: 44,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: AppFontSize.xl,
+                        height: 1.2,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -.2,
+                        color: AppColors.ink,
+                      ),
+                    ),
+                    if (subtitle != null)
                       Text(
-                        title,
+                        subtitle!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 19,
-                          height: 1.1,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -.3,
-                          color: AppColors.ink,
+                          fontSize: AppFontSize.md,
+                          height: 1.3,
+                          color: AppColors.inkMuted,
                         ),
                       ),
-                      if (subtitle != null) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            height: 1.1,
-                            color: AppColors.inkMuted,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+                  ],
                 ),
               ),
-              if (trailing != null) ...[trailing!, const SizedBox(width: 4)],
+              ?trailing,
               IconButton(
-                tooltip: 'Notifications',
+                tooltip: t('Notifications'),
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => const NotificationsScreen(),
                   ),
-                ),
-                style: IconButton.styleFrom(
-                  minimumSize: const Size(48, 48),
-                  backgroundColor: AppColors.surfaceAlt,
                 ),
                 icon: Badge(
                   isLabelVisible: alertCount > 0,
@@ -111,7 +82,7 @@ class ShelfSightHeader extends StatelessWidget {
                   backgroundColor: AppColors.red,
                   child: const Icon(
                     Icons.notifications_none_rounded,
-                    color: AppColors.ink,
+                    color: AppColors.inkMuted,
                   ),
                 ),
               ),
@@ -130,7 +101,7 @@ class NavItem {
   final String label;
 }
 
-/// Floating glass bottom navigation with side margins and rounded edges.
+/// Flat bottom navigation pinned to the screen edge.
 class FloatingGlassNav extends StatelessWidget {
   const FloatingGlassNav({
     super.key,
@@ -139,9 +110,9 @@ class FloatingGlassNav extends StatelessWidget {
     required this.onChanged,
   });
 
-  static const double height = 68;
+  static const double height = 60;
   static double totalHeight(BuildContext context) =>
-      height + math.max(MediaQuery.paddingOf(context).bottom, 8.0) + 8;
+      height + MediaQuery.paddingOf(context).bottom;
 
   final List<NavItem> items;
   final int index;
@@ -149,38 +120,26 @@ class FloatingGlassNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = math.max(MediaQuery.paddingOf(context).bottom, 8.0);
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16, 0, 16, bottom),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(26),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x330B1426),
-              blurRadius: 28,
-              offset: Offset(0, 10),
-            ),
-          ],
-        ),
-        child: GlassSurface(
-          borderRadius: BorderRadius.circular(26),
-          color: AppColors.navy.withValues(alpha: .84),
-          blur: 20,
-          child: SizedBox(
-            height: height,
-            child: Row(
-              children: [
-                for (var i = 0; i < items.length; i++)
-                  Expanded(
-                    child: _NavButton(
-                      item: items[i],
-                      selected: i == index,
-                      onTap: () => onChanged(i),
-                    ),
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
+        child: SizedBox(
+          height: height,
+          child: Row(
+            children: [
+              for (var i = 0; i < items.length; i++)
+                Expanded(
+                  child: _NavButton(
+                    item: items[i],
+                    selected: i == index,
+                    onTap: () => onChanged(i),
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
         ),
       ),
@@ -200,51 +159,40 @@ class _NavButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = selected ? AppColors.navy : AppColors.inkMuted;
     return Semantics(
       button: true,
       selected: selected,
       label: item.label,
       excludeSemantics: true,
       child: InkWell(
-        borderRadius: BorderRadius.circular(22),
         onTap: onTap,
-        child: Center(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            decoration: BoxDecoration(
-              color: selected ? AppColors.emerald : Colors.transparent,
-              borderRadius: BorderRadius.circular(18),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              selected ? item.activeIcon : item.icon,
+              size: 22,
+              color: color,
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  selected ? item.activeIcon : item.icon,
-                  size: 24,
-                  color: selected ? AppColors.navy : Colors.white,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  item.label,
-                  maxLines: 1,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                    color: selected ? AppColors.navy : Colors.white,
-                  ),
-                ),
-              ],
+            const SizedBox(height: 3),
+            Text(
+              item.label,
+              maxLines: 1,
+              style: TextStyle(
+                fontSize: AppFontSize.xs,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                color: color,
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
 }
 
-/// Scroll page under the fixed glass header. Content blurs behind the header
-/// and the shell-provided floating nav.
+/// Scroll page under the fixed header and the shell-provided bottom nav.
 class FixedHeaderScrollView extends StatelessWidget {
   const FixedHeaderScrollView({
     super.key,
@@ -270,12 +218,14 @@ class FixedHeaderScrollView extends StatelessWidget {
           slivers: [
             SliverToBoxAdapter(
               child: SizedBox(
-                height: ShelfSightHeader.totalHeight(context) + 12,
+                height: ShelfSightHeader.totalHeight(context) + 4,
               ),
             ),
             ...slivers,
             SliverToBoxAdapter(
-              child: SizedBox(height: FloatingGlassNav.totalHeight(context) + 12),
+              child: SizedBox(
+                height: FloatingGlassNav.totalHeight(context) + 12,
+              ),
             ),
           ],
         ),
@@ -297,18 +247,18 @@ class FixedHeaderScrollView extends StatelessWidget {
 
 /// Standard horizontal page padding sliver.
 SliverPadding pagePadding(List<Widget> children) => SliverPadding(
-  padding: const EdgeInsets.symmetric(horizontal: 16),
+  padding: const EdgeInsets.symmetric(horizontal: AppSpace.page),
   sliver: SliverList.list(children: children),
 );
 
-/// White rounded surface used for every content block.
+/// Flat white surface used for every content block.
 class SurfaceCard extends StatelessWidget {
   const SurfaceCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(16),
+    this.padding = const EdgeInsets.all(AppSpace.card),
     this.onTap,
-    this.color = Colors.white,
+    this.color = AppColors.surface,
     this.borderColor = AppColors.border,
   });
   final Widget child;
@@ -319,19 +269,12 @@ class SurfaceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(20);
+    const radius = AppRadius.card;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: color,
         borderRadius: radius,
         border: Border.all(color: borderColor),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0F0B1426),
-            blurRadius: 14,
-            offset: Offset(0, 4),
-          ),
-        ],
       ),
       child: Material(
         type: MaterialType.transparency,

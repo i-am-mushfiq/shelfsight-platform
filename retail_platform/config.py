@@ -51,13 +51,30 @@ class Settings:
     access_token_minutes: int = field(
         default_factory=lambda: int(os.getenv("SHELFSIGHT_ACCESS_TOKEN_MINUTES", "720"))
     )
-    # Vision provider used for new inferences: "opencv-baseline" or "claude-crop".
+    # Vision provider used for new inferences: "auto" (claude-shelf when Anthropic credentials
+    # are set, otherwise opencv-baseline), "claude-shelf", "claude-crop" or "opencv-baseline".
     vision_provider: str = field(
-        default_factory=lambda: os.getenv("SHELFSIGHT_VISION_PROVIDER", "opencv-baseline")
+        default_factory=lambda: os.getenv("SHELFSIGHT_VISION_PROVIDER", "auto")
     )
     recognizer_model: str = field(
         default_factory=lambda: os.getenv("SHELFSIGHT_RECOGNIZER_MODEL", "claude-opus-5-5")
     )
+    recognizer_effort: str = field(
+        default_factory=lambda: os.getenv("SHELFSIGHT_RECOGNIZER_EFFORT", "medium")
+    )
+    # Longest side, in pixels, of the shelf photo sent to the recogniser.
+    recognizer_image_side: int = field(
+        default_factory=lambda: int(os.getenv("SHELFSIGHT_RECOGNIZER_IMAGE_SIDE", "1600"))
+    )
+    # Catalogue pack shots sent with each recognition request (0 disables them).
+    max_reference_images: int = field(
+        default_factory=lambda: int(os.getenv("SHELFSIGHT_MAX_REFERENCE_IMAGES", "24"))
+    )
+    # What submitting a visit does with the shelf-driven order: "confirm" places it,
+    # "draft" leaves it for the officer to confirm, "off" creates none.
+    auto_order: str = field(default_factory=lambda: os.getenv("SHELFSIGHT_AUTO_ORDER", "confirm"))
+    # Photos taken of a screen (demo shelves shown on a monitor): auto-detect, always or never.
+    screen_photos: str = field(default_factory=lambda: os.getenv("SHELFSIGHT_SCREEN_PHOTOS", "auto"))
     # Detections below this confidence are flagged for human verification.
     review_confidence_threshold: float = field(
         default_factory=lambda: float(os.getenv("SHELFSIGHT_REVIEW_THRESHOLD", "0.75"))
@@ -68,6 +85,10 @@ class Settings:
     )
 
     def __post_init__(self) -> None:
+        if self.screen_photos not in {"auto", "always", "never"}:
+            raise ValueError("SHELFSIGHT_SCREEN_PHOTOS must be auto, always or never")
+        if self.auto_order not in {"confirm", "draft", "off"}:
+            raise ValueError("SHELFSIGHT_AUTO_ORDER must be confirm, draft or off")
         if not self.jwt_secret:
             object.__setattr__(self, "jwt_secret", _jwt_secret(self.environment))
 

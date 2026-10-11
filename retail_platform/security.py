@@ -62,11 +62,11 @@ def decode_token(token: str) -> dict[str, object]:
 
 PERMISSIONS: dict[str, set[str]] = {
     Role.SALES_OFFICER: {
-        "outlet:read", "catalog:read", "visit:write", "capture:write", "detection:correct",
+        "outlet:read", "outlet:register", "catalog:read", "visit:write", "capture:write", "detection:correct",
         "recommendation:feedback", "order:write", "observation:write", "analytics:read",
     },
     Role.SUPERVISOR: {
-        "outlet:read", "catalog:read", "visit:write", "capture:write", "detection:correct",
+        "outlet:read", "outlet:register", "catalog:read", "visit:write", "capture:write", "detection:correct",
         "recommendation:feedback", "order:write", "observation:write", "analytics:read",
         "classification:override", "team:read",
     },

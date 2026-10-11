@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
+
 import '../services/platform_api.dart';
 import '../services/upload_queue.dart';
 import '../theme/app_theme.dart';
 import '../widgets/shell_widgets.dart';
 import 'detection_review_screen.dart';
 import 'outlet_screen.dart';
+import 'visit_report_screen.dart';
 
 /// Visit history from the platform. Open visits can be resumed.
 class AuditsScreen extends StatefulWidget {
@@ -62,7 +65,7 @@ class _AuditsScreenState extends State<AuditsScreen> {
       }
       if (analysed.isEmpty) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('No analysed photos on this visit yet.')),
+          SnackBar(content: Text(t('No analysed photos on this visit yet.'))),
         );
         return;
       }
@@ -81,11 +84,18 @@ class _AuditsScreenState extends State<AuditsScreen> {
     }
   }
 
+  Future<void> _openReport(Map<String, dynamic> visit) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => VisitReportScreen(visitId: visit['id'] as String)),
+    );
+    if (mounted) _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final visits = _visits;
     return FixedHeaderScrollView(
-      title: 'Visits',
+      title: t('Visits'),
       subtitle: visits == null ? 'Loading…' : '${visits.length} recent',
       slivers: [
         pagePadding([
@@ -102,12 +112,12 @@ class _AuditsScreenState extends State<AuditsScreen> {
                   onTap: UploadQueue.instance.drain,
                   child: Row(
                     children: [
-                      const Icon(Icons.cloud_upload_outlined, color: Color(0xFF92580A)),
+                      const Icon(Icons.cloud_upload_outlined, color: AppColors.amberInk),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           '$pending photo(s) waiting to upload. Tap to retry now.',
-                          style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF92580A)),
+                          style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.amberInk),
                         ),
                       ),
                     ],
@@ -129,8 +139,8 @@ class _AuditsScreenState extends State<AuditsScreen> {
               child: Center(child: CircularProgressIndicator()),
             )
           else if (visits.isEmpty)
-            const SurfaceCard(
-              child: Text('No visits yet. Open a shop from Home and start a shelf audit.'),
+            SurfaceCard(
+              child: Text(t('No visits yet. Open a shop from Home and start a shelf audit.')),
             )
           else
             for (final visit in visits)
@@ -138,7 +148,7 @@ class _AuditsScreenState extends State<AuditsScreen> {
                 padding: const EdgeInsets.only(bottom: 10),
                 child: _VisitCard(
                   visit: visit,
-                  onTap: visit['status'] == 'open' ? () => _resume(visit) : null,
+                  onTap: visit['status'] == 'open' ? () => _resume(visit) : () => _openReport(visit),
                 ),
               ),
         ]),
@@ -178,11 +188,12 @@ class _VisitCard extends StatelessWidget {
               children: [
                 Text(
                   visit['outlet_name'] as String,
-                  style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink),
+                  style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink),
                 ),
                 Text(
-                  '$when · ${visit['photos']} photo(s) · ${open ? 'open — tap to review' : 'submitted'}',
-                  style: const TextStyle(fontSize: 12.5, color: AppColors.inkMuted),
+                  '$when · ${(visit['store_type'] as Map?)?['name'] ?? ''} · ${visit['photos']} photo(s) · '
+                  '${open ? 'not finished, tap to continue' : 'finished, tap to see the result'}',
+                  style: const TextStyle(fontSize: AppFontSize.sm, color: AppColors.inkMuted),
                 ),
               ],
             ),
@@ -193,11 +204,11 @@ class _VisitCard extends StatelessWidget {
               children: [
                 Text(
                   pct(share['value'] as num),
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: AppColors.ink),
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: AppFontSize.lg, color: AppColors.ink),
                 ),
                 Text(
-                  verified != null ? 'verified' : 'unverified',
-                  style: const TextStyle(fontSize: 11.5, color: AppColors.inkMuted),
+                  t('Square'),
+                  style: const TextStyle(fontSize: AppFontSize.xs, color: AppColors.inkMuted),
                 ),
               ],
             ),

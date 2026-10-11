@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, String, UniqueConstraint
+from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, Entity, utcnow
@@ -43,6 +43,12 @@ class Channel(Base, Entity):
     path: Mapped[str] = mapped_column(String(500), index=True)
     description: Mapped[str | None] = mapped_column(String(500))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Store types are the channels an officer picks from when starting a visit.
+    is_store_type: Mapped[bool] = mapped_column(Boolean, default=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    icon: Mapped[str | None] = mapped_column(String(32))
+    # Units stocked behind each facing when a shelf gap is restocked; null inherits from the parent.
+    units_per_facing: Mapped[int | None] = mapped_column(Integer)
 
 
 class Outlet(Base, Entity):

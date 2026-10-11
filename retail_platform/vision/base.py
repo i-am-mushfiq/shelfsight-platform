@@ -24,6 +24,8 @@ class CatalogEntry:
     is_own: bool
     category: str
     pack: str | None
+    # JPEG thumbnails of catalogue pack shots, used by recognisers that compare against them.
+    reference_images: tuple[bytes, ...] = ()
 
 
 @dataclass(slots=True)

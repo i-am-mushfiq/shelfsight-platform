@@ -64,3 +64,11 @@ __pycache__/
 # Platform runtime data (SQLite dev DB, blobs)
 var/
 .venv/
+
+# Large image sets kept out of git. The SFBL catalog images are regenerated with
+# scripts/scrape_sfbl_catalog.py (its README, CSVs and manifest are committed).
+datasets/sfbl_catalog/raw/
+datasets/sfbl_catalog/all_images/
+datasets/sfbl_catalog/products/
+datasets/sfbl_catalog/collages/
+FMCG_Shelf_Test_Set_20/

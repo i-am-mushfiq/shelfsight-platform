@@ -112,12 +112,24 @@ PRODUCTS = [
 CHANNELS = [
     ("GT", "General Trade", None, "সাধারণ দোকান"),
     ("GT-GROC", "Grocery (Mudi)", "GT", "মুদি দোকান"),
-    ("GT-COS", "Cosmetics Store", "GT", "কসমেটিকস"),
+    ("GT-COS", "Cosmetics & Toiletries", "GT", "কসমেটিকস"),
+    ("GT-DEPT", "Departmental Store", "GT", "ডিপার্টমেন্টাল স্টোর"),
     ("MT", "Modern Trade", None, "আধুনিক দোকান"),
     ("MT-SS", "Super Shop", "MT", "সুপার শপ"),
     ("PH", "Pharmacy", None, "ফার্মেসি"),
-    ("WS", "Wholesale", None, "পাইকারি"),
+    ("WS", "Wholesale (Paikari)", None, "পাইকারি"),
 ]
+
+# The six store types an officer picks from at the start of a visit (placeholders until Square
+# confirms its own outlet types): code -> (display order, icon, units restocked per facing, description).
+STORE_TYPES = {
+    "GT-GROC": (1, "grocery", 3, "Neighbourhood mudi shop selling daily essentials over the counter"),
+    "GT-COS": (2, "cosmetics", 2, "Cosmetics and toiletries shop: beauty, hair and personal care"),
+    "GT-DEPT": (3, "departmental", 4, "Independent self-service store with open shelves, not part of a chain"),
+    "MT-SS": (4, "supershop", 6, "Chain supermarket (Shwapno, Meena Bazar, Agora …)"),
+    "PH": (5, "pharmacy", 2, "Pharmacy or drug store that also stocks hygiene products"),
+    "WS": (6, "wholesale", 12, "Wholesaler (paikari) supplying other shops in bulk"),
+}
 
 TERRITORIES = [
     ("BD", "Bangladesh", "country", None, None),
@@ -154,16 +166,20 @@ NAMED_OUTLETS = [
 
 SHOP_WORDS = ["Bhai Bhai", "Maa", "Rahman", "Bismillah", "Madina", "New", "Haque", "Shapla", "Al-Amin", "Sonar Bangla",
               "Green", "Taj", "Rupali", "Janata", "Mollah"]
-SHOP_KIND = {"GT-GROC": "Store", "GT-COS": "Cosmetics", "MT-SS": "Super Shop", "PH": "Pharmacy", "WS": "Traders"}
+SHOP_KIND = {"GT-GROC": "Store", "GT-COS": "Cosmetics", "GT-DEPT": "Departmental", "MT-SS": "Super Shop",
+             "PH": "Pharmacy", "WS": "Traders"}
 
 # Channel mix per territory (weights) and outlets per territory.
 CHANNEL_WEIGHTS = {"GT-GROC": 0.55, "GT-COS": 0.15, "MT-SS": 0.08, "PH": 0.14, "WS": 0.08}
 OUTLETS_PER_TERRITORY = 34
+# Departmental stores are generated from their own random stream (see seed()).
+DEPARTMENTAL_PER_TERRITORY = 6
 
 # Relative demand of each own category by channel (0 = channel does not stock it).
 CHANNEL_CATEGORY_AFFINITY = {
     "GT-GROC": {"BAR": 1.0, "HW": 0.4, "OIL": 1.0, "SHAMPOO": 0.3, "LAUNDRY": 1.0},
     "GT-COS": {"BAR": 1.0, "HW": 0.6, "OIL": 0.9, "SHAMPOO": 1.0, "LAUNDRY": 0.1},
+    "GT-DEPT": {"BAR": 1.4, "HW": 0.9, "OIL": 1.3, "SHAMPOO": 0.9, "LAUNDRY": 1.3},
     "MT-SS": {"BAR": 2.0, "HW": 1.5, "OIL": 1.6, "SHAMPOO": 1.6, "LAUNDRY": 1.4},
     "PH": {"BAR": 0.6, "HW": 1.4, "OIL": 0.2, "SHAMPOO": 0.4, "LAUNDRY": 0.0},
     "WS": {"BAR": 3.5, "HW": 1.0, "OIL": 3.0, "SHAMPOO": 0.8, "LAUNDRY": 3.5},
@@ -234,8 +250,10 @@ def seed(session: Session, anchor: date | None = None, months: int = 6, rng_seed
     for code, name, parent, bn in CHANNELS:
         parent_ch = channels.get(parent) if parent else None
         path = (parent_ch.path if parent_ch else "/") + code.lower() + "/"
+        order, icon, depth, description = STORE_TYPES.get(code, (0, None, None, None))
         channels[code] = w.add(Channel(code=code, name=name, name_bn=bn, parent_id=parent_ch.id if parent_ch else None,
-                                       path=path))
+                                       path=path, is_store_type=code in STORE_TYPES, sort_order=order, icon=icon,
+                                       units_per_facing=depth, description=description))
         session.flush()
 
     territories: dict[str, Territory] = {}
@@ -266,8 +284,8 @@ def seed(session: Session, anchor: date | None = None, months: int = 6, rng_seed
         outlet = w.add(Outlet(code=code, name=name, address=address, lat=lat, lng=lng,
                               territory_id=territories[territory].id, distributor_id=distributors[territory].id,
                               channel_id=channels[channel].id,
-                              shelf_meters=24.0 if channel == "MT-SS" else 3.5,
-                              size_sqft=4000 if channel == "MT-SS" else 350))
+                              shelf_meters={"MT-SS": 24.0, "GT-DEPT": 9.0}.get(channel, 3.5),
+                              size_sqft={"MT-SS": 4000, "GT-DEPT": 900}.get(channel, 350)))
         outlets.append((outlet, channel))
     counter = 200
     for territory, (clat, clng) in centers.items():
@@ -285,11 +303,28 @@ def seed(session: Session, anchor: date | None = None, months: int = 6, rng_seed
                 channel_id=channels[channel].id, size_sqft=round(size), shelf_meters=round(size / 110, 1),
             ))
             outlets.append((outlet, channel))
+    # The sixth store type was added after the rest of the synthetic world existed. Its outlets
+    # and their orders come from a separate random stream, so every other outlet, order and
+    # gap is exactly what it was before.
+    dept_rng = random.Random(rng_seed + 1)
+    departmental: list[tuple[Outlet, str]] = []
+    for territory, (clat, clng) in centers.items():
+        for _ in range(DEPARTMENTAL_PER_TERRITORY):
+            counter += 1
+            size = dept_rng.uniform(600, 1500)
+            outlet = w.add(Outlet(
+                code=f"S-{counter}", name=f"{dept_rng.choice(SHOP_WORDS)} {SHOP_KIND['GT-DEPT']}",
+                owner_name=f"Owner {counter} (synthetic)", address=f"Synthetic address {counter}",
+                lat=round(clat + dept_rng.uniform(-0.012, 0.012), 6), lng=round(clng + dept_rng.uniform(-0.012, 0.012), 6),
+                territory_id=territories[territory].id, distributor_id=distributors[territory].id,
+                channel_id=channels["GT-DEPT"].id, size_sqft=round(size), shelf_meters=round(size / 110, 1),
+            ))
+            departmental.append((outlet, "GT-DEPT"))
     session.flush()
 
     officer_for = {"T-BAN": "SO-1001", "T-MIR": "SO-1042", "T-DHN": "SO-1077", "T-AGR": "SO-1103"}
     territory_code = {t.id: code for code, t in territories.items()}
-    for outlet, _ in outlets:
+    for outlet, _ in outlets + departmental:
         w.add(OutletAssignment(outlet_id=outlet.id, user_id=users[officer_for[territory_code[outlet.territory_id]]].id,
                                effective_from=anchor - timedelta(days=365)))
 
@@ -297,7 +332,7 @@ def seed(session: Session, anchor: date | None = None, months: int = 6, rng_seed
     own_skus = [p for p in PRODUCTS if p[8] is not None]
     order_count = 0
     start = anchor - timedelta(days=int(months * 30.44))
-    for outlet, channel in outlets:
+    for outlet, channel, stream in [(o, c, rng) for o, c in outlets] + [(o, c, dept_rng) for o, c in departmental]:
         affinity = CHANNEL_CATEGORY_AFFINITY[channel]
         scale = math.sqrt((outlet.size_sqft or 300) / 300)
         # Each outlet carries a subset of SKUs: some gaps are deliberate so peers reveal them.
@@ -306,10 +341,10 @@ def seed(session: Session, anchor: date | None = None, months: int = 6, rng_seed
             category = _r[2]
             if affinity.get(category, 0) == 0:
                 continue
-            if rng.random() < 0.82:
+            if stream.random() < 0.82:
                 carried.append(sku)
-        visit_every = rng.choice([7, 7, 14]) if channel != "WS" else 7
-        day = start + timedelta(days=rng.randint(0, visit_every - 1))
+        visit_every = stream.choice([7, 7, 14]) if channel != "WS" else 7
+        day = start + timedelta(days=stream.randint(0, visit_every - 1))
         number = 0
         while day <= anchor:
             number += 1
@@ -318,8 +353,8 @@ def seed(session: Session, anchor: date | None = None, months: int = 6, rng_seed
                 spec = next(p for p in own_skus if p[0] == sku)
                 weekly = spec[8] * affinity[spec[3]] * scale * 6
                 mean = weekly * visit_every / 7
-                quantity = max(0, int(rng.gauss(mean, mean * 0.35) + 0.5))
-                if quantity and rng.random() < 0.93:
+                quantity = max(0, int(stream.gauss(mean, mean * 0.35) + 0.5))
+                if quantity and stream.random() < 0.93:
                     items.append((sku, quantity, round(spec[7] * 0.88, 2)))
             if items:
                 order = w.add(Order(outlet_id=outlet.id, distributor_id=outlet.distributor_id, order_date=day,
@@ -354,8 +389,11 @@ def seed(session: Session, anchor: date | None = None, months: int = 6, rng_seed
     session.flush()
     for channel, shares in {
         "GT-GROC": {"MERIL": 0.36, "JUI": 0.22, "CHAKA": 0.27, "SEPNIL": 0.15},
+        "GT-COS": {"MERIL": 0.55, "JUI": 0.25, "SEPNIL": 0.15},
+        "GT-DEPT": {"MERIL": 0.35, "JUI": 0.20, "CHAKA": 0.22, "SEPNIL": 0.23},
         "MT-SS": {"MERIL": 0.34, "JUI": 0.18, "CHAKA": 0.18, "SEPNIL": 0.30},
         "PH": {"SEPNIL": 0.65, "MERIL": 0.30},
+        "WS": {"MERIL": 0.35, "JUI": 0.25, "CHAKA": 0.35},
     }.items():
         for brand, share in shares.items():
             w.add(PortfolioTarget(rule_set_id=portfolio_rules.id, channel_id=channels[channel].id, dimension="brand",
@@ -363,6 +401,7 @@ def seed(session: Session, anchor: date | None = None, months: int = 6, rng_seed
     core = {
         "GT-GROC": ["SQ-MER-SOAP-100", "SQ-JUI-OIL-100", "SQ-CHK-DET-500"],
         "GT-COS": ["SQ-MER-SOAP-100", "SQ-MER-SHMP-180", "SQ-JUI-OIL-100"],
+        "GT-DEPT": ["SQ-MER-SOAP-100", "SQ-SEP-HW-200", "SQ-JUI-OIL-200", "SQ-CHK-DET-500"],
         "MT-SS": ["SQ-MER-SOAP-100", "SQ-MER-SOAP-150", "SQ-SEP-HW-200", "SQ-JUI-OIL-200", "SQ-CHK-DET-1K"],
         "PH": ["SQ-SEP-HW-200", "SQ-SEP-HW-RF-170"],
         "WS": ["SQ-MER-SOAP-100", "SQ-JUI-OIL-200", "SQ-CHK-DET-1K"],
@@ -385,6 +424,14 @@ def seed(session: Session, anchor: date | None = None, months: int = 6, rng_seed
     w.add(PlacementRule(rule_set_id=placement_rules.id, channel_id=channels["PH"].id, category_id=categories["HW"].id,
                         brand_id=brands["SEPNIL"].id, preferred_band="eye", min_facings=2, priority=1,
                         description="Sepnil hand wash at eye level in pharmacies"))
+    w.add(PlacementRule(rule_set_id=placement_rules.id, channel_id=channels["GT-COS"].id,
+                        category_id=categories["SHAMPOO"].id, product_id=products["SQ-MER-SHMP-180"].id,
+                        preferred_band="eye", min_facings=2, priority=2,
+                        description="Meril shampoo at eye level in cosmetics stores, ≥2 facings"))
+    w.add(PlacementRule(rule_set_id=placement_rules.id, channel_id=channels["WS"].id,
+                        category_id=categories["LAUNDRY"].id, manufacturer_id=manufacturers["SQ"].id,
+                        preferred_band="any", min_facings=6, priority=2,
+                        description="Chaka detergent block of ≥6 facings at wholesalers"))
 
     # --- outlet classification scheme ------------------------------------------------------
     scheme = w.add(ClassScheme(code="POTENTIAL", name="Outlet Potential (synthetic v1)", version=1, status="active",
@@ -410,7 +457,7 @@ def seed(session: Session, anchor: date | None = None, months: int = 6, rng_seed
                                         observed_price=round(spec[7] * rng.uniform(0.9, 1.02), 0),
                                         source="manual", notes="Synthetic observation"))
     session.flush()
-    return SeedSummary(organization_id=org.id, outlets=len(outlets), products=len(products), orders=order_count,
+    return SeedSummary(organization_id=org.id, outlets=len(outlets) + len(departmental), products=len(products), orders=order_count,
                        users=[u[0] for u in USERS])
 
 

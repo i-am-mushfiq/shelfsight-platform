@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
+
 import '../models/session.dart';
 import '../services/platform_api.dart';
 import '../theme/app_theme.dart';
@@ -23,7 +25,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return FixedHeaderScrollView(
-      title: 'Profile',
+      title: t('Profile'),
       slivers: [
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -48,8 +50,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               currentSession.value?.initials ?? 'RA',
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 23,
-                                fontWeight: FontWeight.w900,
+                                fontSize: AppFontSize.xxl,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
@@ -61,8 +63,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 Text(
                                   currentSession.value?.name ?? 'Rahim Ahmed',
                                   style: TextStyle(
-                                    fontSize: 19,
-                                    fontWeight: FontWeight.w900,
+                                    fontSize: AppFontSize.xl,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                                 SizedBox(height: 4),
@@ -83,23 +85,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const SizedBox(height: 18),
                       const Divider(),
                       const SizedBox(height: 14),
-                      const Row(
+                      Row(
                         children: [
                           Expanded(
                             child: _ProfileMetric(
                               value: '142',
-                              label: 'Audits',
+                              label: t('Audits'),
                             ),
                           ),
                           SizedBox(height: 38, child: VerticalDivider()),
                           Expanded(
-                            child: _ProfileMetric(value: '38', label: 'Stores'),
+                            child: _ProfileMetric(value: '38', label: t('Stores')),
                           ),
                           SizedBox(height: 38, child: VerticalDivider()),
                           Expanded(
                             child: _ProfileMetric(
                               value: '96%',
-                              label: 'On time',
+                              label: t('On time'),
                             ),
                           ),
                         ],
@@ -121,7 +123,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     borderRadius: BorderRadius.circular(22),
                     border: Border.all(color: const Color(0xFFA7F3D0)),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
                       Icon(
                         Icons.cloud_done_outlined,
@@ -133,30 +135,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'All data synced',
+                              t('All data synced'),
                               style: TextStyle(
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w600,
                                 color: AppColors.emeraldDark,
                               ),
                             ),
                             SizedBox(height: 3),
                             Text(
-                              'Last sync • just now',
+                              t('Last sync • just now'),
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: AppFontSize.sm,
                                 color: AppColors.emeraldDark,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      StatusPill(label: 'ONLINE'),
+                      StatusPill(label: t('ONLINE')),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 24),
-              const _SettingHeader(title: 'Capture & storage'),
+              _SettingHeader(title: t('Capture & storage')),
               const SizedBox(height: 10),
               Card(
                 child: Column(
@@ -166,11 +168,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onChanged: (value) =>
                           setState(() => _captureHints = value),
                       secondary: const Icon(Icons.tips_and_updates_outlined),
-                      title: const Text(
-                        'Capture guidance',
-                        style: TextStyle(fontWeight: FontWeight.w700),
+                      title: Text(
+                        t('Capture guidance'),
+                        style: TextStyle(fontWeight: FontWeight.w600),
                       ),
-                      subtitle: const Text('Show alignment and quality tips'),
+                      subtitle: Text(t('Show alignment and quality tips')),
                     ),
                     const Divider(height: 1, indent: 56),
                     SwitchListTile.adaptive(
@@ -178,11 +180,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onChanged: (value) =>
                           setState(() => _saveOriginals = value),
                       secondary: const Icon(Icons.photo_library_outlined),
-                      title: const Text(
-                        'Keep original photos',
-                        style: TextStyle(fontWeight: FontWeight.w700),
+                      title: Text(
+                        t('Keep original photos'),
+                        style: TextStyle(fontWeight: FontWeight.w600),
                       ),
-                      subtitle: const Text('Save a local copy after upload'),
+                      subtitle: Text(t('Save a local copy after upload')),
                     ),
                     const Divider(height: 1, indent: 56),
                     SwitchListTile.adaptive(
@@ -190,31 +192,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onChanged: (value) =>
                           setState(() => _useMobileData = value),
                       secondary: const Icon(Icons.network_cell_outlined),
-                      title: const Text(
-                        'Upload on mobile data',
-                        style: TextStyle(fontWeight: FontWeight.w700),
+                      title: Text(
+                        t('Upload on mobile data'),
+                        style: TextStyle(fontWeight: FontWeight.w600),
                       ),
-                      subtitle: const Text('Otherwise wait for Wi-Fi'),
+                      subtitle: Text(t('Otherwise wait for Wi-Fi')),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 24),
-              const _SettingHeader(title: 'App settings'),
+              _SettingHeader(title: t('App settings')),
               const SizedBox(height: 10),
               Card(
                 child: Column(
                   children: [
                     _SettingsRow(
                       icon: Icons.language_rounded,
-                      title: 'Language',
-                      trailing: 'English',
+                      title: t('Language'),
+                      trailing: t('English'),
                       onTap: _showLanguagePicker,
                     ),
                     const Divider(height: 1, indent: 56),
                     _SettingsRow(
                       icon: Icons.notifications_none_rounded,
-                      title: 'Notifications',
+                      title: t('Notifications'),
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => const NotificationsScreen(),
@@ -224,7 +226,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const Divider(height: 1, indent: 56),
                     _SettingsRow(
                       icon: Icons.admin_panel_settings_outlined,
-                      title: 'App permissions',
+                      title: t('App permissions'),
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => const PermissionsScreen(),
@@ -234,7 +236,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const Divider(height: 1, indent: 56),
                     _SettingsRow(
                       icon: Icons.help_outline_rounded,
-                      title: 'Help & support',
+                      title: t('Help & support'),
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => const HelpSupportScreen(),
@@ -262,17 +264,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     shape: const StadiumBorder(),
                   ),
                   icon: const Icon(Icons.logout_rounded),
-                  label: const Text(
-                    'Sign out',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  label: Text(
+                    t('Sign out'),
+                    style: TextStyle(fontSize: AppFontSize.lg, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
               const SizedBox(height: 14),
-              const Center(
+              Center(
                 child: Text(
-                  'ShelfSight 1.0.0 • Field build',
-                  style: TextStyle(fontSize: 11, color: AppColors.inkMuted),
+                  t('ShelfSight 1.0.0 • Field build'),
+                  style: TextStyle(fontSize: AppFontSize.xs, color: AppColors.inkMuted),
                 ),
               ),
             ],
@@ -294,13 +296,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'App language',
+                t('App language'),
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 12),
               ListTile(
                 onTap: () => Navigator.pop(context),
-                title: const Text('English'),
+                title: Text(t('English')),
                 trailing: const Icon(
                   Icons.radio_button_checked_rounded,
                   color: AppColors.emeraldDark,
@@ -331,12 +333,12 @@ class _ProfileMetric extends StatelessWidget {
     children: [
       Text(
         value,
-        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+        style: const TextStyle(fontSize: AppFontSize.xl, fontWeight: FontWeight.w600),
       ),
       const SizedBox(height: 2),
       Text(
         label,
-        style: const TextStyle(fontSize: 11, color: AppColors.inkMuted),
+        style: const TextStyle(fontSize: AppFontSize.xs, color: AppColors.inkMuted),
       ),
     ],
   );
@@ -349,9 +351,9 @@ class _SettingHeader extends StatelessWidget {
   Widget build(BuildContext context) => Text(
     title.toUpperCase(),
     style: const TextStyle(
-      fontSize: 11,
+      fontSize: AppFontSize.xs,
       color: AppColors.inkMuted,
-      fontWeight: FontWeight.w800,
+      fontWeight: FontWeight.w600,
       letterSpacing: .8,
     ),
   );
@@ -372,14 +374,14 @@ class _SettingsRow extends StatelessWidget {
   Widget build(BuildContext context) => ListTile(
     onTap: onTap,
     leading: Icon(icon, color: AppColors.inkMuted),
-    title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+    title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
     trailing: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (trailing != null)
           Text(
             trailing!,
-            style: const TextStyle(color: AppColors.inkMuted, fontSize: 12),
+            style: const TextStyle(color: AppColors.inkMuted, fontSize: AppFontSize.sm),
           ),
         const SizedBox(width: 5),
         const Icon(Icons.chevron_right_rounded, color: AppColors.inkMuted),

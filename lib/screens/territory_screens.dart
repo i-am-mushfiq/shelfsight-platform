@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
+
 import '../models/session.dart';
 import '../services/platform_api.dart';
 import '../theme/app_theme.dart';
@@ -50,7 +52,7 @@ class _LoaderState extends State<_Loader> {
       title: widget.title,
       subtitle: widget.subtitle(data),
       trailing: IconButton(
-        tooltip: 'Refresh',
+        tooltip: t('Refresh'),
         onPressed: _load,
         icon: const Icon(Icons.refresh_rounded),
       ),
@@ -93,7 +95,7 @@ class TerritoryDashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _Loader(
-      title: 'Dashboard',
+      title: t('Dashboard'),
       subtitle: (data) => '${session.territory} · ${session.roleLabel}',
       load: _load,
       builder: (context, data) {
@@ -129,12 +131,12 @@ class TerritoryDashboardScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'OWN SHARE OF SHELF',
+                Text(
+                  t('OWN SHARE OF SHELF'),
                   style: TextStyle(
                     color: Color(0xFFB6C2D4),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
+                    fontSize: AppFontSize.sm,
+                    fontWeight: FontWeight.w600,
                     letterSpacing: 1.1,
                   ),
                 ),
@@ -143,9 +145,9 @@ class TerritoryDashboardScreen extends StatelessWidget {
                   total > 0 ? pct(own / total) : 'No audits yet',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: total > 0 ? 44 : 26,
+                    fontSize: total > 0 ? AppFontSize.hero : AppFontSize.xxl,
                     height: 1.1,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w600,
                     letterSpacing: -1,
                   ),
                 ),
@@ -161,11 +163,11 @@ class TerritoryDashboardScreen extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _Metric(label: 'Own sales / month', value: _money(value))),
+              Expanded(child: _Metric(label: t('Own sales / month'), value: _money(value))),
               const SizedBox(width: 10),
               Expanded(
                 child: _Metric(
-                  label: 'Visited in 30 days',
+                  label: t('Visited in 30 days'),
                   value: outlets > 0 ? pct(visited / outlets) : '—',
                 ),
               ),
@@ -173,15 +175,15 @@ class TerritoryDashboardScreen extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           _Metric(
-            label: 'Open portfolio opportunity (peer-based estimate)',
+            label: t('Open portfolio opportunity (peer-based estimate)'),
             value: '${_money(opportunity)} / month',
           ),
           const SizedBox(height: 22),
-          const SectionTitle(title: 'Share of shelf by company'),
+          SectionTitle(title: t('Share of shelf by company')),
           const SizedBox(height: 8),
           SurfaceCard(
             child: manufacturers.isEmpty
-                ? const Text('Appears after the first shelf audits. Competitor brands need SKU-level recognition.')
+                ? Text(t('Appears after the first shelf audits. Competitor brands need SKU-level recognition.'))
                 : Column(
                     children: [
                       for (final m in manufacturers)
@@ -194,7 +196,7 @@ class TerritoryDashboardScreen extends StatelessWidget {
                   ),
           ),
           const SizedBox(height: 22),
-          const SectionTitle(title: 'By territory'),
+          SectionTitle(title: t('By territory')),
           const SizedBox(height: 8),
           for (final g in groups)
             Padding(
@@ -208,12 +210,12 @@ class TerritoryDashboardScreen extends StatelessWidget {
                         children: [
                           Text(
                             g['label'] as String,
-                            style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink),
+                            style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink),
                           ),
                           Text(
                             '${g['outlets']} outlets · ${_money(g['monthly_value_bdt'] as num)}/month · '
                             '${g['open_recommendations']} open actions',
-                            style: const TextStyle(fontSize: 12.5, color: AppColors.inkMuted),
+                            style: const TextStyle(fontSize: AppFontSize.sm, color: AppColors.inkMuted),
                           ),
                         ],
                       ),
@@ -241,9 +243,9 @@ class _Metric extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12.5, color: AppColors.inkMuted)),
+        Text(label, style: const TextStyle(fontSize: AppFontSize.sm, color: AppColors.inkMuted)),
         const SizedBox(height: 4),
-        Text(value, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.ink)),
+        Text(value, style: const TextStyle(fontSize: AppFontSize.xl, fontWeight: FontWeight.w600, color: AppColors.ink)),
       ],
     ),
   );
@@ -262,7 +264,7 @@ class _ShareRow extends StatelessWidget {
       children: [
         Expanded(
           flex: 5,
-          child: Text(name, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.ink)),
+          child: Text(name, style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink)),
         ),
         Expanded(
           flex: 6,
@@ -281,7 +283,7 @@ class _ShareRow extends StatelessWidget {
           child: Text(
             '${value.round()}%',
             textAlign: TextAlign.right,
-            style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink),
+            style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink),
           ),
         ),
       ],
@@ -296,7 +298,7 @@ class TerritoryAlertsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _Loader(
-      title: 'Exceptions',
+      title: t('Exceptions'),
       subtitle: (data) => 'Outlets needing attention',
       load: () => PlatformApi.instance.overview(groupBy: 'outlet'),
       builder: (context, data) {
@@ -309,9 +311,9 @@ class TerritoryAlertsScreen extends StatelessWidget {
         final lowShare = outlets.where((o) => o['share_of_shelf'] != null).toList()
           ..sort((a, b) => (a['share_of_shelf'] as num).compareTo(b['share_of_shelf'] as num));
         return [
-          const SectionTitle(title: 'Lowest own share of shelf'),
+          SectionTitle(title: t('Lowest own share of shelf')),
           const SizedBox(height: 8),
-          if (lowShare.isEmpty) const SurfaceCard(child: Text('No audited outlets yet.')),
+          if (lowShare.isEmpty) SurfaceCard(child: Text(t('No audited outlets yet.'))),
           for (final o in lowShare.take(5))
             _ExceptionRow(
               important: true,
@@ -319,7 +321,7 @@ class TerritoryAlertsScreen extends StatelessWidget {
               detail: 'Own share ${pct(o['share_of_shelf'] as num)} at the latest audit',
             ),
           const SizedBox(height: 18),
-          const SectionTitle(title: 'Largest portfolio gaps'),
+          SectionTitle(title: t('Largest portfolio gaps')),
           const SizedBox(height: 8),
           for (final o in opportunity.take(5))
             _ExceptionRow(
@@ -329,9 +331,9 @@ class TerritoryAlertsScreen extends StatelessWidget {
                   '${_money(o['opportunity_bdt_per_month'] as num)}/month (estimate)',
             ),
           const SizedBox(height: 18),
-          const SectionTitle(title: 'Not visited in 30 days'),
+          SectionTitle(title: t('Not visited in 30 days')),
           const SizedBox(height: 8),
-          if (notVisited.isEmpty) const SurfaceCard(child: Text('Every outlet was visited in the last 30 days.')),
+          if (notVisited.isEmpty) SurfaceCard(child: Text(t('Every outlet was visited in the last 30 days.'))),
           for (final o in notVisited.take(5))
             _ExceptionRow(
               important: false,
@@ -371,8 +373,8 @@ class _ExceptionRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink)),
-                Text(detail, style: const TextStyle(fontSize: 13, color: AppColors.inkMuted, height: 1.35)),
+                Text(title, style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink)),
+                Text(detail, style: const TextStyle(fontSize: AppFontSize.md, color: AppColors.inkMuted, height: 1.35)),
               ],
             ),
           ),
@@ -388,7 +390,7 @@ class TerritoryTeamScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _Loader(
-      title: 'Team',
+      title: t('Team'),
       subtitle: (data) => data == null ? 'Sales Officers' : '${(data['groups'] as List).length} Sales Officers',
       load: () => PlatformApi.instance.overview(groupBy: 'officer'),
       builder: (context, data) => [
@@ -405,7 +407,7 @@ class TerritoryTeamScreen extends StatelessWidget {
                     decoration: BoxDecoration(color: AppColors.navy, borderRadius: BorderRadius.circular(15)),
                     child: Text(
                       (m['label'] as String).split(' ').where((p) => p.isNotEmpty).map((p) => p[0]).take(2).join(),
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -415,12 +417,12 @@ class TerritoryTeamScreen extends StatelessWidget {
                       children: [
                         Text(
                           m['label'] as String,
-                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15.5, color: AppColors.ink),
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: AppFontSize.lg, color: AppColors.ink),
                         ),
                         Text(
                           '${m['outlets']} outlets · ${m['visited_30d']} visited in 30 days · '
                           '${m['open_recommendations']} open actions',
-                          style: const TextStyle(color: AppColors.inkMuted, fontSize: 13),
+                          style: const TextStyle(color: AppColors.inkMuted, fontSize: AppFontSize.md),
                         ),
                       ],
                     ),

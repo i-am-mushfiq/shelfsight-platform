@@ -6,6 +6,9 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:path_provider/path_provider.dart';
+
+import '../l10n/l10n.dart';
 
 /// Thrown for any failed platform call. [retryable] is true for network
 /// failures and 5xx/429, which the upload queue retries later.
@@ -50,10 +53,77 @@ class PlatformApi {
   PlatformApi._();
   static final PlatformApi instance = PlatformApi._();
 
-  static const String baseUrl = String.fromEnvironment(
+  /// The address the app was built with; the server address field on the sign-in screen
+  /// overrides it (saved on the phone), so a demo laptop's IP needs no rebuild.
+  static const String defaultBaseUrl = String.fromEnvironment(
     'SHELFSIGHT_API_URL',
     defaultValue: 'https://shelfsight-api-lqqn.onrender.com',
   );
+  static String baseUrl = defaultBaseUrl;
+
+  static Future<File> _serverFile() async =>
+      File('${(await getApplicationDocumentsDirectory()).path}/server_address.txt');
+
+  /// Restores a saved server address. Called once at start-up.
+  static Future<void> loadServerAddress() async {
+    try {
+      final file = await _serverFile();
+      if (await file.exists()) {
+        final saved = (await file.readAsString()).trim();
+        if (saved.isNotEmpty) baseUrl = saved;
+      }
+    } catch (_) {
+      // No storage (tests) or unreadable file: keep the built-in address.
+    }
+  }
+
+  /// Accepts "192.168.0.103", "192.168.0.103:8000" or a full URL. A bare address gets
+  /// http:// and, without a port, :8000 (the demo server's port).
+  static String normalizeServerAddress(String input) {
+    var value = input.trim();
+    while (value.endsWith('/')) {
+      value = value.substring(0, value.length - 1);
+    }
+    if (value.isEmpty) return defaultBaseUrl;
+    if (!value.contains('://')) {
+      value = 'http://$value';
+      final uri = Uri.tryParse(value);
+      if (uri != null && !uri.hasPort) value = '$value:8000';
+    }
+    return value;
+  }
+
+  /// Switches server (signing out, since a token is only valid on its own server) and saves it.
+  Future<String> setServerAddress(String input) async {
+    final value = normalizeServerAddress(input);
+    if (Uri.tryParse(value)?.host.isEmpty ?? true) {
+      throw const ApiException('That is not a valid server address.');
+    }
+    baseUrl = value;
+    _token = null;
+    try {
+      final file = await _serverFile();
+      if (value == defaultBaseUrl) {
+        if (await file.exists()) await file.delete();
+      } else {
+        await file.writeAsString(value);
+      }
+    } catch (_) {
+      // Not saved: it still applies until the app closes.
+    }
+    return value;
+  }
+
+  /// Reachability check for the server address field.
+  Future<String> ping(String address) async {
+    final value = normalizeServerAddress(address);
+    final body = await _send(
+      () => _client.get(Uri.parse('$value/health'), headers: const {'Accept': 'application/json'}),
+      timeout: const Duration(seconds: 8),
+    );
+    final provider = body is Map ? body['vision_provider'] : null;
+    return provider == null ? 'Server reachable' : 'Server reachable · recognition: $provider';
+  }
 
   http.Client _client = http.Client();
   String? _token;
@@ -67,6 +137,8 @@ class PlatformApi {
 
   Map<String, String> get _headers => {
     'Accept': 'application/json',
+    // Text the server writes (briefs, order reasons, recommendations) comes in this language.
+    'Accept-Language': isBangla ? 'bn' : 'en',
     if (_token != null) 'Authorization': 'Bearer $_token',
   };
 
@@ -125,6 +197,14 @@ class PlatformApi {
         timeout: timeout ?? const Duration(seconds: 60),
       );
 
+  Future<dynamic> _put(String path, Object body) => _send(
+    () => _client.put(
+      _uri(path),
+      headers: {..._headers, 'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    ),
+  );
+
   // --- auth -------------------------------------------------------------------------
 
   Future<AuthUser> login(String employeeId, String password) async {
@@ -146,6 +226,31 @@ class PlatformApi {
   Future<List<Map<String, dynamic>>> outlets() async =>
       ((await _get('/v2/outlets')) as List).cast<Map<String, dynamic>>();
 
+  Future<Map<String, dynamic>> outlet(String outletId) async =>
+      (await _get('/v2/outlets/$outletId')) as Map<String, dynamic>;
+
+  /// Registers a shop found in the field. It starts unverified and assigned to the officer.
+  Future<Map<String, dynamic>> registerOutlet({
+    required String clientOutletId,
+    required String name,
+    required String storeTypeId,
+    String? ownerName,
+    String? phone,
+    String? address,
+    double? lat,
+    double? lng,
+  }) async =>
+      (await _post('/v2/outlets', {
+        'client_outlet_id': clientOutletId,
+        'name': name,
+        'store_type_id': storeTypeId,
+        'owner_name': ?ownerName,
+        'phone': ?phone,
+        'address': ?address,
+        'lat': ?lat,
+        'lng': ?lng,
+      })) as Map<String, dynamic>;
+
   Future<Map<String, dynamic>> refreshIntelligence(String outletId) async =>
       (await _post('/v2/outlets/$outletId/intelligence:refresh')) as Map<String, dynamic>;
 
@@ -163,8 +268,25 @@ class PlatformApi {
   Future<Map<String, dynamic>> callBrief(String outletId) async =>
       (await _get('/v2/outlets/$outletId/call-brief')) as Map<String, dynamic>;
 
-  Future<Map<String, dynamic>> suggestedOrder(String outletId) async =>
-      (await _get('/v2/outlets/$outletId/suggested-order')) as Map<String, dynamic>;
+  Future<Map<String, dynamic>> suggestedOrder(String outletId, {String? visitId}) async =>
+      (await _get('/v2/outlets/$outletId/suggested-order', {'visit_id': ?visitId}))
+          as Map<String, dynamic>;
+
+  Future<Map<String, dynamic>> order(String orderId) async =>
+      (await _get('/v2/orders/$orderId')) as Map<String, dynamic>;
+
+  Future<Map<String, dynamic>> updateOrder(
+    String orderId,
+    List<Map<String, dynamic>> lines, {
+    String? note,
+  }) async =>
+      (await _put('/v2/orders/$orderId', {'lines': lines, 'note': ?note})) as Map<String, dynamic>;
+
+  Future<Map<String, dynamic>> confirmOrder(String orderId) async =>
+      (await _post('/v2/orders/$orderId/confirm')) as Map<String, dynamic>;
+
+  Future<Map<String, dynamic>> cancelOrder(String orderId, String reason) async =>
+      (await _post('/v2/orders/$orderId/cancel', {'reason': reason})) as Map<String, dynamic>;
 
   Future<Map<String, dynamic>> createOrder(
     String outletId,
@@ -185,20 +307,29 @@ class PlatformApi {
   Future<List<Map<String, dynamic>>> categories() async =>
       ((await _get('/v2/catalog/categories')) as List).cast<Map<String, dynamic>>();
 
+  /// The store types an officer chooses from at the start of a visit, in display order.
+  Future<List<Map<String, dynamic>>> storeTypes() async =>
+      ((await _get('/v2/catalog/store-types')) as List).cast<Map<String, dynamic>>();
+
   // --- field ---------------------------------------------------------------------------
 
   Future<Map<String, dynamic>> startVisit({
     required String clientVisitId,
     required String outletId,
+    String? storeTypeId,
     double? lat,
     double? lng,
   }) async =>
       (await _post('/v2/visits', {
         'client_visit_id': clientVisitId,
         'outlet_id': outletId,
+        'store_type_id': ?storeTypeId,
         'lat': ?lat,
         'lng': ?lng,
       })) as Map<String, dynamic>;
+
+  Future<Map<String, dynamic>> visitReport(String visitId) async =>
+      (await _get('/v2/visits/$visitId/report')) as Map<String, dynamic>;
 
   Future<List<Map<String, dynamic>>> visits() async =>
       ((await _get('/v2/visits')) as List).cast<Map<String, dynamic>>();
@@ -225,6 +356,39 @@ class PlatformApi {
     request.files.add(
       await http.MultipartFile.fromPath('image', filePath, contentType: _mediaType(filePath)),
     );
+    return (await _send(
+      () async => http.Response.fromStream(await _client.send(request)),
+      timeout: const Duration(minutes: 3),
+    )) as Map<String, dynamic>;
+  }
+
+  /// Looks up catalogue products in one camera frame. Nothing is stored on the server.
+  Future<Map<String, dynamic>> liveDetect(String filePath, {String? categoryId}) async {
+    final request = http.MultipartRequest('POST', _uri('/v2/live/detect'))..headers.addAll(_headers);
+    if (categoryId != null) request.fields['category_id'] = categoryId;
+    request.files.add(await http.MultipartFile.fromPath('frame', filePath, contentType: _mediaType(filePath)));
+    return (await _send(
+      () async => http.Response.fromStream(await _client.send(request)),
+      timeout: const Duration(seconds: 15),
+    )) as Map<String, dynamic>;
+  }
+
+  /// Uploads the frames of a 360° photo sphere; the server stitches and analyses them.
+  Future<Map<String, dynamic>> uploadSphere({
+    required String visitId,
+    required List<String> framePaths,
+    required List<double> yaws,
+    required String clientCaptureId,
+    String? categoryId,
+  }) async {
+    final request = http.MultipartRequest('POST', _uri('/v2/visits/$visitId/spheres'))
+      ..headers.addAll(_headers)
+      ..fields['client_capture_id'] = clientCaptureId
+      ..fields['yaws'] = jsonEncode(yaws);
+    if (categoryId != null) request.fields['category_id'] = categoryId;
+    for (final path in framePaths) {
+      request.files.add(await http.MultipartFile.fromPath('frames', path, contentType: _mediaType(path)));
+    }
     return (await _send(
       () async => http.Response.fromStream(await _client.send(request)),
       timeout: const Duration(minutes: 3),

@@ -19,9 +19,11 @@ class Order(Base, Entity):
     distributor_id: Mapped[str | None] = mapped_column(ForeignKey("distributor.id"))
     visit_id: Mapped[str | None] = mapped_column(ForeignKey("visit.id"))
     order_date: Mapped[date] = mapped_column(Date, index=True)
-    source: Mapped[str] = mapped_column(String(16), default="ingest")  # ingest | app
+    source: Mapped[str] = mapped_column(String(16), default="ingest")  # ingest | app | auto
     external_ref: Mapped[str] = mapped_column(String(64))
-    status: Mapped[str] = mapped_column(String(16), default="confirmed")
+    status: Mapped[str] = mapped_column(String(16), default="confirmed")  # draft | confirmed | cancelled
+    # How an app or auto order was produced and changed: generator version, mode, cancellation.
+    meta: Mapped[dict] = mapped_column(JSON, default=dict)
 
     items: Mapped[list[OrderItem]] = relationship(back_populates="order", cascade="all, delete-orphan")
 
@@ -37,6 +39,8 @@ class OrderItem(Base, Entity):
     # Closed loop: what the platform suggested vs what was ordered.
     suggested_quantity: Mapped[int | None] = mapped_column(Integer)
     recommendation_id: Mapped[str | None] = mapped_column(ForeignKey("recommendation.id"))
+    # Why the suggested quantity was suggested (history, shelf gap, recommendation, promotion).
+    sources: Mapped[list | None] = mapped_column(JSON)
 
     order: Mapped[Order] = relationship(back_populates="items")
 

@@ -2,15 +2,17 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
+
 import '../services/platform_api.dart';
 import '../services/upload_queue.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_widgets.dart';
 import '../widgets/shell_widgets.dart';
-import 'audit_result_screen.dart';
+import 'visit_report_screen.dart';
 
 Color labelColor(String label, String verification) {
-  if (verification == 'rejected') return const Color(0xFF94A3B8);
+  if (verification == 'rejected') return AppColors.inkSubtle;
   return switch (label) {
     'own' => AppColors.emeraldDark,
     'competitor' => AppColors.red,
@@ -18,7 +20,7 @@ Color labelColor(String label, String verification) {
   };
 }
 
-/// Human-in-the-loop review. The model's prediction is never overwritten: each
+/// Human-in-the-loop review, asked one pack at a time. The model's prediction is never overwritten: each
 /// action is stored as a correction tied to the model version that made it.
 class DetectionReviewScreen extends StatefulWidget {
   const DetectionReviewScreen({
@@ -42,6 +44,7 @@ class _DetectionReviewScreenState extends State<DetectionReviewScreen> {
   final Map<String, Uint8List> _images = {};
   List<Map<String, dynamic>> _products = const [];
   String? _selected; // detection id
+  final Set<String> _skipped = {};
   String? _error;
   bool _busy = false;
 
@@ -49,13 +52,7 @@ class _DetectionReviewScreenState extends State<DetectionReviewScreen> {
   Map<String, dynamic>? get _capture => _captures[_captureId];
   List<Map<String, dynamic>> get _detections =>
       ((_capture?['detections'] as List?) ?? const []).cast<Map<String, dynamic>>();
-  int get _needReview => _detections.where((d) => d['needs_review'] == true).length;
   int get _unverified => _detections.where((d) => d['verification'] == 'unverified').length;
-
-  int get _totalNeedReview => _captures.values
-      .expand((c) => ((c['detections'] as List?) ?? const []).cast<Map<String, dynamic>>())
-      .where((d) => d['needs_review'] == true)
-      .length;
 
   @override
   void initState() {
@@ -89,8 +86,11 @@ class _DetectionReviewScreenState extends State<DetectionReviewScreen> {
     }
   }
 
+  /// The next pack to ask about. Skipped packs come back once the others are answered.
   void _selectNext() {
-    final next = _detections.where((d) => d['needs_review'] == true).firstOrNull;
+    final pending = _detections.where((d) => d['needs_review'] == true).toList();
+    if (pending.isNotEmpty && pending.every((d) => _skipped.contains(d['id']))) _skipped.clear();
+    final next = pending.where((d) => !_skipped.contains(d['id'])).firstOrNull;
     setState(() => _selected = next?['id'] as String?);
   }
 
@@ -160,9 +160,10 @@ class _DetectionReviewScreenState extends State<DetectionReviewScreen> {
       await UploadQueue.instance.clearVisit(widget.visitId);
       navigator.pushReplacement(
         MaterialPageRoute(
-          builder: (_) => AuditResultScreen(
-            storeName: widget.storeName,
-            intelligence: result['intelligence'] as Map<String, dynamic>,
+          builder: (_) => VisitReportScreen(
+            visitId: widget.visitId,
+            report: result['report'] as Map<String, dynamic>,
+            closeToOutlet: true,
           ),
         ),
       );
@@ -175,52 +176,68 @@ class _DetectionReviewScreenState extends State<DetectionReviewScreen> {
   String _productName(String? id) =>
       _products.where((p) => p['id'] == id).map((p) => p['name'] as String).firstOrNull ?? '';
 
+  /// Packs on this photo that still need an answer (skipped ones come back last).
+  List<Map<String, dynamic>> get _pending => _detections.where((d) => d['needs_review'] == true).toList();
+
+  int? get _nextPhotoWithWork {
+    for (var i = 1; i <= widget.captureIds.length; i++) {
+      final index = (_photo + i) % widget.captureIds.length;
+      if (index == _photo) break;
+      final detections = ((_captures[widget.captureIds[index]]?['detections'] as List?) ?? const [])
+          .cast<Map<String, dynamic>>();
+      if (detections.any((d) => d['needs_review'] == true)) return index;
+    }
+    return null;
+  }
+
+  Future<void> _goToPhoto(int index) async {
+    setState(() {
+      _photo = index;
+      _selected = null;
+      _skipped.clear();
+    });
+    await _loadImage();
+    _selectNext();
+  }
+
+  void _skip() {
+    final current = _selected;
+    if (current == null) return;
+    _skipped.add(current);
+    _selectNext();
+  }
+
   @override
   Widget build(BuildContext context) {
     final capture = _capture;
     final image = _images[_captureId];
     final current = _current;
+    final pending = _pending;
+    final position = current == null ? 0 : pending.indexWhere((d) => d['id'] == current['id']) + 1;
+    final nextPhoto = _nextPhotoWithWork;
     return Scaffold(
       backgroundColor: AppColors.canvas,
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Review detections'),
+            Text(t('Check the results')),
             Text(
-              'Photo ${_photo + 1} of ${widget.captureIds.length} · $_needReview need review',
-              style: const TextStyle(fontSize: 12, color: AppColors.inkMuted, fontWeight: FontWeight.w500),
+              [
+                if (widget.captureIds.length > 1) 'Photo ${_photo + 1} of ${widget.captureIds.length}',
+                pending.isEmpty ? 'All checked' : '${pending.length} to check',
+              ].join(' · '),
+              style: const TextStyle(fontSize: AppFontSize.sm, color: AppColors.inkMuted, fontWeight: FontWeight.w500),
             ),
           ],
         ),
-        actions: [
-          if (widget.captureIds.length > 1)
-            IconButton(
-              tooltip: 'Next photo',
-              onPressed: () async {
-                setState(() {
-                  _photo = (_photo + 1) % widget.captureIds.length;
-                  _selected = null;
-                });
-                await _loadImage();
-                _selectNext();
-              },
-              icon: const Icon(Icons.navigate_next_rounded),
-            ),
-        ],
       ),
       bottomNavigationBar: SafeArea(
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: AppColors.border)),
-          ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(AppSpace.page, 8, AppSpace.page, 12),
           child: PrimaryButton(
-            label: _totalNeedReview > 0
-                ? 'Submit visit ($_totalNeedReview still uncertain)'
-                : 'Submit verified audit',
-            icon: Icons.check_rounded,
+            label: _busy ? 'Please wait…' : 'Finish visit',
+            icon: Icons.flag_outlined,
             onPressed: _busy || capture == null ? null : _submit,
           ),
         ),
@@ -234,7 +251,7 @@ class _DetectionReviewScreenState extends State<DetectionReviewScreen> {
                   children: [
                     Text(_error!, textAlign: TextAlign.center),
                     const SizedBox(height: 12),
-                    PrimaryButton(label: 'Try again', icon: Icons.refresh_rounded, onPressed: _loadAll),
+                    PrimaryButton(label: t('Try again'), onPressed: _loadAll),
                   ],
                 ),
               ),
@@ -242,10 +259,42 @@ class _DetectionReviewScreenState extends State<DetectionReviewScreen> {
           : capture == null || image == null
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(AppSpace.page, 4, AppSpace.page, AppSpace.xl),
               children: [
+                if (current != null) ...[
+                  _PackZoom(image: image, capture: capture, detection: current),
+                  const SizedBox(height: AppSpace.lg),
+                  _Question(
+                    detection: current,
+                    productName: _productName((current['final'] as Map)['product_id'] as String?),
+                    position: position,
+                    total: pending.length,
+                    busy: _busy,
+                    onConfirm: (current['predicted'] as Map)['label'] == 'unknown' ? null : () => _review('confirm'),
+                    onOwn: () => _review('correct', label: 'own'),
+                    onCompetitor: () => _review('correct', label: 'competitor'),
+                    onReject: () => _review('reject'),
+                    onPickProduct: _pickProduct,
+                    onSkip: pending.length > 1 ? _skip : null,
+                  ),
+                ] else
+                  _Done(
+                    nextPhoto: nextPhoto == null ? null : nextPhoto + 1,
+                    unverified: _unverified,
+                    busy: _busy,
+                    onNextPhoto: nextPhoto == null ? null : () => _goToPhoto(nextPhoto),
+                    onConfirmRest: _confirmConfident,
+                  ),
+                const SizedBox(height: AppSpace.section),
+                Padding(
+                  padding: EdgeInsets.only(left: 4, bottom: 8),
+                  child: Text(
+                    t('Where it is on the shelf'),
+                    style: TextStyle(fontSize: AppFontSize.md, fontWeight: FontWeight.w500, color: AppColors.inkMuted),
+                  ),
+                ),
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                   child: AspectRatio(
                     aspectRatio: (capture['width'] as num) / (capture['height'] as num),
                     child: LayoutBuilder(
@@ -279,130 +328,241 @@ class _DetectionReviewScreenState extends State<DetectionReviewScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                const Wrap(
-                  spacing: 12,
+                const SizedBox(height: AppSpace.sm),
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 6,
                   children: [
-                    _Legend(color: AppColors.emeraldDark, label: 'Own'),
-                    _Legend(color: AppColors.red, label: 'Competitor'),
-                    _Legend(color: AppColors.amber, label: 'Uncertain'),
-                    _Legend(color: Color(0xFF94A3B8), label: 'Not a product'),
+                    _Legend(color: AppColors.emeraldDark, label: t('Square')),
+                    _Legend(color: AppColors.red, label: t('Other company')),
+                    _Legend(color: AppColors.amber, label: t('Not sure')),
                   ],
                 ),
-                const SizedBox(height: 12),
-                if (current == null)
-                  SurfaceCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _needReview == 0
-                              ? 'Nothing left that needs review on this photo.'
-                              : 'Tap a box to review it.',
-                          style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.ink),
-                        ),
-                        if (_unverified > 0) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            '$_unverified confident detection(s) are not yet human-verified. '
-                            'Check the boxes, then confirm them to put this audit on a verified basis.',
-                            style: const TextStyle(fontSize: 13, color: AppColors.inkMuted),
-                          ),
-                          const SizedBox(height: 8),
-                          OutlinedButton.icon(
-                            onPressed: _busy ? null : _confirmConfident,
-                            icon: const Icon(Icons.done_all_rounded),
-                            label: const Text('Boxes look right: confirm them'),
-                          ),
-                        ],
-                      ],
-                    ),
-                  )
-                else
-                  _ReviewPanel(
-                    detection: current,
-                    productName: _productName((current['final'] as Map)['product_id'] as String?),
-                    busy: _busy,
-                    onOwn: () => _review('correct', label: 'own'),
-                    onCompetitor: () => _review('correct', label: 'competitor'),
-                    onReject: () => _review('reject'),
-                    onConfirm: (current['predicted'] as Map)['label'] == 'unknown'
-                        ? null
-                        : () => _review('confirm'),
-                    onPickProduct: _pickProduct,
-                  ),
+                const SizedBox(height: 4),
+                Text(
+                  t('Tap any box on the photo to check that pack.'),
+                  style: TextStyle(fontSize: AppFontSize.sm, color: AppColors.inkMuted),
+                ),
               ],
             ),
     );
   }
 }
 
-class _ReviewPanel extends StatelessWidget {
-  const _ReviewPanel({
+/// The pack being asked about, cut out of the shelf photo and enlarged.
+class _PackZoom extends StatelessWidget {
+  const _PackZoom({required this.image, required this.capture, required this.detection});
+  final Uint8List image;
+  final Map<String, dynamic> capture;
+  final Map<String, dynamic> detection;
+
+  @override
+  Widget build(BuildContext context) {
+    final b = detection['box'] as Map;
+    final x = (b['x'] as num).toDouble(), y = (b['y'] as num).toDouble();
+    final w = (b['width'] as num).toDouble(), h = (b['height'] as num).toDouble();
+    final aspect = (capture['width'] as num) / (capture['height'] as num);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      child: Container(
+        height: 240,
+        color: AppColors.navy,
+        child: LayoutBuilder(
+          builder: (context, view) {
+            // Scale the photo so the pack fills about two thirds of the view, centred.
+            var width = view.maxWidth * .66 / w;
+            var height = width / aspect;
+            if (h * height > view.maxHeight * .8) {
+              height = view.maxHeight * .8 / h;
+              width = height * aspect;
+            }
+            final left = view.maxWidth / 2 - (x + w / 2) * width;
+            final top = view.maxHeight / 2 - (y + h / 2) * height;
+            return Stack(
+              clipBehavior: Clip.hardEdge,
+              children: [
+                Positioned(
+                  left: left,
+                  top: top,
+                  width: width,
+                  height: height,
+                  child: Image.memory(image, fit: BoxFit.fill, gaplessPlayback: true),
+                ),
+                Positioned(
+                  left: left + x * width - 4,
+                  top: top + y * height - 4,
+                  width: w * width + 8,
+                  height: h * height + 8,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.white, width: 3),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+String _certainty(num confidence) => confidence >= .85
+    ? 'Sure'
+    : confidence >= .6
+    ? 'Probably'
+    : 'Not sure';
+
+/// One question about one pack, with answers as big, plain buttons.
+class _Question extends StatelessWidget {
+  const _Question({
     required this.detection,
     required this.productName,
+    required this.position,
+    required this.total,
     required this.busy,
+    required this.onConfirm,
     required this.onOwn,
     required this.onCompetitor,
     required this.onReject,
-    required this.onConfirm,
     required this.onPickProduct,
+    required this.onSkip,
   });
   final Map<String, dynamic> detection;
   final String productName;
+  final int position;
+  final int total;
   final bool busy;
+  final VoidCallback? onConfirm;
   final VoidCallback onOwn;
   final VoidCallback onCompetitor;
   final VoidCallback onReject;
-  final VoidCallback? onConfirm;
   final VoidCallback onPickProduct;
+  final VoidCallback? onSkip;
 
   @override
   Widget build(BuildContext context) {
     final predicted = detection['predicted'] as Map;
-    final finalLabel = (detection['final'] as Map)['label'] as String;
-    final verification = detection['verification'] as String;
-    final confidence = ((predicted['confidence'] as num) * 100).round();
-    return SurfaceCard(
-      borderColor: labelColor(finalLabel, verification),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    final label = predicted['label'] as String;
+    final guess = switch (label) {
+      'own' => productName.isEmpty ? 'a Square product' : productName,
+      'competitor' => productName.isEmpty ? "another company's product" : productName,
+      _ => null,
+    };
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Pack $position of $total',
+          style: const TextStyle(fontSize: AppFontSize.sm, color: AppColors.inkMuted),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          guess == null ? 'What is this pack?' : 'Is this $guess?',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        if (guess != null) ...[
+          const SizedBox(height: 4),
           Text(
-            verification == 'unverified'
-                ? 'Model says: ${predicted['label']} ($confidence% confident)'
-                : 'Reviewed: ${verification == 'rejected' ? 'not a product' : finalLabel}'
-                      '${productName.isEmpty ? '' : ' · $productName'}',
-            style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink),
-          ),
-          Text(
-            'Shelf row ${detection['shelf_row']} of ${detection['shelf_rows_total']} (from the top)',
-            style: const TextStyle(fontSize: 12.5, color: AppColors.inkMuted),
-          ),
-          const SizedBox(height: 12),
-          const Text('What is this?', style: TextStyle(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              if (onConfirm != null)
-                FilledButton.icon(
-                  onPressed: busy ? null : onConfirm,
-                  style: FilledButton.styleFrom(backgroundColor: AppColors.navy),
-                  icon: const Icon(Icons.check_rounded, size: 18),
-                  label: const Text('Model is right'),
-                ),
-              OutlinedButton(onPressed: busy ? null : onOwn, child: const Text('Our product')),
-              OutlinedButton(onPressed: busy ? null : onCompetitor, child: const Text('Competitor')),
-              OutlinedButton(onPressed: busy ? null : onPickProduct, child: const Text('Choose exact product…')),
-              OutlinedButton(onPressed: busy ? null : onReject, child: const Text('Not a product')),
-            ],
+            'Our guess · ${_certainty(predicted['confidence'] as num)}',
+            style: const TextStyle(fontSize: AppFontSize.md, color: AppColors.inkMuted),
           ),
         ],
-      ),
+        const SizedBox(height: AppSpace.lg),
+        if (onConfirm != null) ...[
+          FilledButton.icon(
+            onPressed: busy ? null : onConfirm,
+            icon: const Icon(Icons.check_rounded),
+            label: Text(t('Yes, that is right')),
+          ),
+          const SizedBox(height: AppSpace.sm),
+        ],
+        _Answer(
+          icon: Icons.verified_outlined,
+          text: label == 'own' ? 'No, it is another company' : 'It is a Square product',
+          onPressed: busy ? null : (label == 'own' ? onCompetitor : onOwn),
+        ),
+        if (label == 'unknown') ...[
+          const SizedBox(height: AppSpace.sm),
+          _Answer(icon: Icons.storefront_outlined, text: "It is another company's", onPressed: busy ? null : onCompetitor),
+        ],
+        const SizedBox(height: AppSpace.sm),
+        _Answer(icon: Icons.block_rounded, text: t('It is not a product'), onPressed: busy ? null : onReject),
+        const SizedBox(height: AppSpace.xs),
+        Row(
+          children: [
+            TextButton(onPressed: busy ? null : onPickProduct, child: Text(t('Choose the exact product'))),
+            const Spacer(),
+            if (onSkip != null) TextButton(onPressed: busy ? null : onSkip, child: Text(t('Skip'))),
+          ],
+        ),
+      ],
     );
   }
+}
+
+class _Answer extends StatelessWidget {
+  const _Answer({required this.icon, required this.text, required this.onPressed});
+  final IconData icon;
+  final String text;
+  final VoidCallback? onPressed;
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+    onPressed: onPressed,
+    style: OutlinedButton.styleFrom(alignment: Alignment.centerLeft, backgroundColor: AppColors.surface),
+    icon: Icon(icon, size: 20),
+    label: Text(text),
+  );
+}
+
+/// Shown when nothing on this photo needs an answer.
+class _Done extends StatelessWidget {
+  const _Done({
+    required this.nextPhoto,
+    required this.unverified,
+    required this.busy,
+    required this.onNextPhoto,
+    required this.onConfirmRest,
+  });
+  final int? nextPhoto;
+  final int unverified;
+  final bool busy;
+  final VoidCallback? onNextPhoto;
+  final VoidCallback onConfirmRest;
+  @override
+  Widget build(BuildContext context) => SurfaceCard(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(Icons.check_circle_outline_rounded, color: AppColors.emeraldDark, size: 32),
+        const SizedBox(height: AppSpace.sm),
+        Text(
+          nextPhoto == null ? 'Everything is checked' : 'This photo is done',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          nextPhoto == null
+              ? 'Tap Finish visit to see the result and the order.'
+              : 'Photo $nextPhoto still has packs to check.',
+          style: const TextStyle(color: AppColors.inkMuted),
+        ),
+        if (onNextPhoto != null) ...[
+          const SizedBox(height: AppSpace.lg),
+          FilledButton(onPressed: onNextPhoto, child: Text('Go to photo $nextPhoto')),
+        ],
+        if (unverified > 0) ...[
+          const SizedBox(height: AppSpace.sm),
+          TextButton(
+            onPressed: busy ? null : onConfirmRest,
+            child: Text(t('The other packs look right')),
+          ),
+        ],
+      ],
+    ),
+  );
 }
 
 class _Legend extends StatelessWidget {
@@ -415,7 +575,7 @@ class _Legend extends StatelessWidget {
     children: [
       Container(width: 12, height: 12, decoration: BoxDecoration(border: Border.all(color: color, width: 2.5))),
       const SizedBox(width: 5),
-      Text(label, style: const TextStyle(fontSize: 12.5, color: AppColors.inkMuted)),
+      Text(label, style: const TextStyle(fontSize: AppFontSize.sm, color: AppColors.inkMuted)),
     ],
   );
 }
@@ -485,8 +645,8 @@ class _ProductPickerState extends State<_ProductPicker> {
                 child: TextField(
                   autofocus: true,
                   onChanged: (value) => setState(() => _query = value),
-                  decoration: const InputDecoration(
-                    hintText: 'Search product or brand',
+                  decoration: InputDecoration(
+                    hintText: t('Search product or brand'),
                     prefixIcon: Icon(Icons.search_rounded),
                   ),
                 ),

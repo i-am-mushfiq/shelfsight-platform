@@ -24,6 +24,8 @@ class ProductInfo:
     mrp: float | None = None
     trade_price: float | None = None
     is_active: bool = True
+    # Orders are rounded up to this many units (e.g. a dozen); 1 = loose units.
+    order_multiple: int = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,3 +103,23 @@ class Gap:
     priority: int = 2
     confidence: float = 0.5
     extra: dict = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class ShelfStock:
+    """What one visit's photos show about stock, as ordering and availability logic need it.
+
+    covered_categories: categories whose shelf was photographed. A photo tagged with a
+      category covers it and its sub-categories; an untagged ("mixed rack") photo covers the
+      categories of the products identified on it. Products outside these were not checked.
+    facings_by_product: identified facings per product (boxes a human rejected excluded).
+    unidentified_by_category: facings not identified at SKU level that could belong to the
+      category's products (facings known to be competitors are not counted).
+    """
+
+    visit_id: str
+    covered_categories: frozenset[str]
+    facings_by_product: dict[str, int]
+    unidentified_by_category: dict[str, int]
+    verified_ratio: float
+    model_versions: tuple[str, ...] = ()

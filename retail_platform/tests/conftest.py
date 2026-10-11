@@ -8,6 +8,8 @@ import numpy as np
 import pytest
 
 os.environ.setdefault("SHELFSIGHT_JSON_LOGS", "0")
+# The visual lookup loads two neural networks; tests use the exact matcher unless they ask for it.
+os.environ["SHELFSIGHT_VISUAL_LOOKUP"] = "0"
 
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import select  # noqa: E402

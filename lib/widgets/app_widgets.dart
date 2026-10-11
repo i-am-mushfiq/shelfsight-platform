@@ -45,36 +45,39 @@ class PrimaryButton extends StatelessWidget {
     super.key,
     required this.label,
     required this.onPressed,
-    this.icon = Icons.arrow_forward_rounded,
+    this.icon,
     this.backgroundColor = AppColors.navy,
     this.foregroundColor = Colors.white,
   });
   final String label;
   final VoidCallback? onPressed;
-  final IconData icon;
+  final IconData? icon;
   final Color backgroundColor;
   final Color foregroundColor;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: double.infinity,
-    height: 56,
-    child: FilledButton.icon(
-      onPressed: onPressed,
-      style: FilledButton.styleFrom(
-        backgroundColor: backgroundColor,
-        foregroundColor: foregroundColor,
-        disabledBackgroundColor: AppColors.border,
-        shape: const StadiumBorder(),
-      ),
-      iconAlignment: IconAlignment.end,
-      icon: Icon(icon, size: 21),
-      label: Text(
-        label,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-      ),
-    ),
-  );
+  Widget build(BuildContext context) {
+    final style = FilledButton.styleFrom(
+      backgroundColor: backgroundColor,
+      foregroundColor: foregroundColor,
+      disabledBackgroundColor: AppColors.surfaceAlt,
+      disabledForegroundColor: AppColors.inkSubtle,
+      shape: const RoundedRectangleBorder(borderRadius: AppRadius.control),
+      textStyle: AppText.label.copyWith(fontSize: AppFontSize.lg, fontWeight: FontWeight.w500),
+    );
+    return SizedBox(
+      width: double.infinity,
+      height: 54,
+      child: icon == null
+          ? FilledButton(onPressed: onPressed, style: style, child: Text(label))
+          : FilledButton.icon(
+              onPressed: onPressed,
+              style: style,
+              icon: Icon(icon, size: 19),
+              label: Text(label),
+            ),
+    );
+  }
 }
 
 class StatusPill extends StatelessWidget {
@@ -97,20 +100,24 @@ class StatusPill extends StatelessWidget {
       borderRadius: BorderRadius.circular(999),
     ),
     child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 5),
+            Icon(icon, size: 13, color: color),
+            const SizedBox(width: 4),
           ],
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: color,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: AppFontSize.sm,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
             ),
           ),
         ],

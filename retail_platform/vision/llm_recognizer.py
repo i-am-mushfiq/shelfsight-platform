@@ -23,7 +23,8 @@ from .base import CatalogEntry, ProviderDetection, ProviderResult, VisionProvide
 log = logging.getLogger(__name__)
 
 # USD per million tokens (input, output). Configurable; keep in sync with the vendor price list.
-PRICES = {"claude-opus-5-5": (4.0, 20.0), "claude-sonnet-5-5": (2.0, 10.0), "claude-haiku-4-5": (1.0, 5.0)}
+PRICES = {"claude-opus-5-5": (4.0, 20.0), "claude-sonnet-5-5": (2.0, 10.0), "claude-haiku-5-5": (0.10, 0.50),
+          "claude-haiku-4-5": (1.0, 5.0)}
 
 SYSTEM_PROMPT = (
     "You identify retail products in cropped photos of shelf facings from shops in Bangladesh. "

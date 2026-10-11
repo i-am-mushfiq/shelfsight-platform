@@ -1,8 +1,11 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+
+import '../l10n/l10n.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../models/field_models.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_widgets.dart';
 import 'audit_upload_screen.dart';
@@ -11,23 +14,25 @@ class ReviewScreen extends StatefulWidget {
   const ReviewScreen({
     super.key,
     required this.storeName,
+    required this.storeTypeName,
     required this.visitId,
-    required this.categoryId,
-    required this.categoryName,
-    required this.imagePaths,
+    required this.photos,
+    this.spheres = const [],
   });
   final String storeName;
+  final String storeTypeName;
   final String visitId;
-  final String categoryId;
-  final String categoryName;
-  final List<String> imagePaths;
+  final List<CapturedPhoto> photos;
+
+  /// 360° spheres already uploaded and stitched (they are captures on the server).
+  final List<Map<String, dynamic>> spheres;
   @override
   State<ReviewScreen> createState() => _ReviewScreenState();
 }
 
 class _ReviewScreenState extends State<ReviewScreen> {
   final ImagePicker _picker = ImagePicker();
-  late final List<String> _photos = [...widget.imagePaths];
+  late final List<CapturedPhoto> _photos = [...widget.photos];
 
   Future<void> _addPhoto() async {
     final photo = await _picker.pickImage(
@@ -35,7 +40,12 @@ class _ReviewScreenState extends State<ReviewScreen> {
       imageQuality: 88,
       maxWidth: 2400,
     );
-    if (photo != null && mounted) setState(() => _photos.add(photo.path));
+    if (photo == null || !mounted) return;
+    // A new section usually belongs to the rack photographed last.
+    final last = _photos.lastOrNull;
+    setState(() => _photos.add(
+      CapturedPhoto(path: photo.path, categoryId: last?.categoryId, categoryName: last?.categoryName),
+    ));
   }
 
   Future<void> _retake(int index) async {
@@ -44,21 +54,21 @@ class _ReviewScreenState extends State<ReviewScreen> {
       imageQuality: 88,
       maxWidth: 2400,
     );
-    if (photo != null && mounted) setState(() => _photos[index] = photo.path);
+    if (photo != null && mounted) setState(() => _photos[index] = _photos[index].withPath(photo.path));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Column(
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Review photos'),
+            Text(t('Your photos')),
             Text(
-              'Step 3 of 3  •  Quality check',
+              t('Check they are clear, then send them'),
               style: TextStyle(
-                fontSize: 12,
+                fontSize: AppFontSize.sm,
                 color: AppColors.inkMuted,
                 fontWeight: FontWeight.w500,
               ),
@@ -96,22 +106,22 @@ class _ReviewScreenState extends State<ReviewScreen> {
                                 Text(
                                   widget.storeName,
                                   style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: AppFontSize.lg,
                                   ),
                                 ),
                                 const SizedBox(height: 3),
-                                const Text(
-                                  'Food & Beverage',
-                                  style: TextStyle(
-                                    fontSize: 12,
+                                Text(
+                                  widget.storeTypeName,
+                                  style: const TextStyle(
+                                    fontSize: AppFontSize.sm,
                                     color: AppColors.inkMuted,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          StatusPill(label: '${_photos.length} photos'),
+                          StatusPill(label: '${_photos.length + widget.spheres.length} photos'),
                         ],
                       ),
                     ),
@@ -124,7 +134,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                       borderRadius: BorderRadius.circular(22),
                       border: Border.all(color: const Color(0xFFA7F3D0)),
                     ),
-                    child: const Row(
+                    child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(
@@ -138,17 +148,17 @@ class _ReviewScreenState extends State<ReviewScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Ready to analyze',
+                                t('Photos look good'),
                                 style: TextStyle(
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w600,
                                   color: AppColors.emeraldDark,
                                 ),
                               ),
                               SizedBox(height: 4),
                               Text(
-                                'Basic blur and exposure checks passed. You can still retake any photo.',
+                                t('Not blurry or too dark. You can still take any photo again.'),
                                 style: TextStyle(
-                                  fontSize: 13,
+                                  fontSize: AppFontSize.md,
                                   height: 1.4,
                                   color: AppColors.emeraldDark,
                                 ),
@@ -159,6 +169,20 @@ class _ReviewScreenState extends State<ReviewScreen> {
                       ],
                     ),
                   ),
+                  for (final sphere in widget.spheres)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Card(
+                        child: ListTile(
+                          leading: const Icon(Icons.threesixty_rounded, color: AppColors.emeraldDark),
+                          title: Text(t('360° photo sphere'), style: TextStyle(fontWeight: FontWeight.w600)),
+                          subtitle: Text(
+                            '${(sphere['sphere'] as Map?)?['frames'] ?? '?'} photos · '
+                            '${(sphere['sphere'] as Map?)?['stitched'] == false ? 'side by side' : 'stitched'} · uploaded',
+                          ),
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 18),
                   GridView.builder(
                     shrinkWrap: true,
@@ -176,8 +200,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                         return _AddPhotoCard(onTap: _addPhoto);
                       }
                       return _PhotoCard(
-                        index: index,
-                        imagePath: _photos[index],
+                        photo: _photos[index],
                         onRetake: () => _retake(index),
                         onDelete: () => setState(() => _photos.removeAt(index)),
                       );
@@ -193,18 +216,16 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 border: Border(top: BorderSide(color: AppColors.border)),
               ),
               child: PrimaryButton(
-                label: 'Upload and analyse',
-                icon: Icons.auto_awesome_rounded,
-                onPressed: _photos.isEmpty
+                label: t('Send photos'),
+                onPressed: _photos.isEmpty && widget.spheres.isEmpty
                     ? null
                     : () => Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => AuditUploadScreen(
                             storeName: widget.storeName,
                             visitId: widget.visitId,
-                            categoryId: widget.categoryId,
-                            categoryName: widget.categoryName,
-                            imagePaths: List.unmodifiable(_photos),
+                            photos: List.unmodifiable(_photos),
+                            sphereCaptureIds: [for (final s in widget.spheres) s['id'] as String],
                           ),
                         ),
                       ),
@@ -219,13 +240,11 @@ class _ReviewScreenState extends State<ReviewScreen> {
 
 class _PhotoCard extends StatelessWidget {
   const _PhotoCard({
-    required this.index,
-    required this.imagePath,
+    required this.photo,
     required this.onRetake,
     required this.onDelete,
   });
-  final int index;
-  final String imagePath;
+  final CapturedPhoto photo;
   final VoidCallback onRetake;
   final VoidCallback onDelete;
   @override
@@ -241,13 +260,13 @@ class _PhotoCard extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.file(File(imagePath), fit: BoxFit.cover),
-                  const Align(
+                  Image.file(File(photo.path), fit: BoxFit.cover),
+                  Align(
                     alignment: Alignment.topLeft,
                     child: Padding(
                   padding: EdgeInsets.all(8),
                       child: StatusPill(
-                        label: 'Selected',
+                        label: t('Selected'),
                         icon: Icons.check_circle_outline_rounded,
                         color: Colors.white,
                         background: AppColors.emeraldDark,
@@ -260,23 +279,19 @@ class _PhotoCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            [
-              'Left section',
-              'Center section',
-              'Right section',
-              'Extra section',
-            ][index % 4],
+            photo.rackLabel,
             maxLines: 1,
-            style: const TextStyle(fontWeight: FontWeight.w800),
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 3),
-          const Text(
-            'Quality checked during analysis',
+          Text(
+            t('Checked when sent'),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
+              fontSize: AppFontSize.sm,
+              fontWeight: FontWeight.w600,
               color: AppColors.inkMuted,
             ),
           ),
@@ -316,16 +331,16 @@ class _AddPhotoCard extends StatelessWidget {
         border: Border.all(color: AppColors.border, width: 2),
         borderRadius: BorderRadius.circular(24),
       ),
-      child: const Column(
+      child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.add_a_photo_outlined, size: 34, color: AppColors.inkMuted),
           SizedBox(height: 12),
-          Text('Add section', style: TextStyle(fontWeight: FontWeight.w800)),
+          Text(t('Add section'), style: TextStyle(fontWeight: FontWeight.w600)),
           SizedBox(height: 4),
           Text(
-            'Capture another photo',
-            style: TextStyle(fontSize: 12, color: AppColors.inkMuted),
+            t('Capture another photo'),
+            style: TextStyle(fontSize: AppFontSize.sm, color: AppColors.inkMuted),
           ),
         ],
       ),

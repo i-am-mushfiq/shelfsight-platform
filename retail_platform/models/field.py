@@ -34,6 +34,10 @@ class Visit(Base, Entity):
     distance_from_outlet_m: Mapped[float | None] = mapped_column(Float)
     status: Mapped[str] = mapped_column(String(16), default="open")  # open | submitted
     notes: Mapped[str | None] = mapped_column(String(2000))
+    # Store type (channel) the officer selected for this visit, and the outlet's channel
+    # before that selection changed it (null when it was unchanged).
+    store_type_id: Mapped[str | None] = mapped_column(ForeignKey("channel.id"))
+    previous_store_type_id: Mapped[str | None] = mapped_column(ForeignKey("channel.id"))
 
 
 class ShelfCapture(Base, Entity):

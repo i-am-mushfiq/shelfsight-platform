@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
+
 import '../theme/app_theme.dart';
 import '../widgets/app_widgets.dart';
 
@@ -15,9 +17,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Notifications'),
+        title: Text(t('Notifications')),
         actions: [
-          TextButton(onPressed: () {}, child: const Text('Mark all read')),
+          TextButton(onPressed: () {}, child: Text(t('Mark all read'))),
         ],
       ),
       body: ListView(
@@ -26,14 +28,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           Row(
             children: [
               ChoiceChip(
-                label: const Text('All'),
+                label: Text(t('All')),
                 selected: !_unreadOnly,
                 showCheckmark: false,
                 onSelected: (_) => setState(() => _unreadOnly = false),
               ),
               const SizedBox(width: 8),
               ChoiceChip(
-                label: const Text('Unread 3'),
+                label: Text(t('Unread 3')),
                 selected: _unreadOnly,
                 showCheckmark: false,
                 onSelected: (_) => setState(() => _unreadOnly = true),
@@ -41,39 +43,39 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ],
           ),
           const SizedBox(height: 20),
-          const _NoticeCard(
+          _NoticeCard(
             icon: Icons.rate_review_outlined,
-            title: 'Audit needs review',
-            body: '7 uncertain products in Meena Bazar need classification.',
-            time: '8 min ago',
+            title: t('Audit needs review'),
+            body: t('7 uncertain products in Meena Bazar need classification.'),
+            time: t('8 min ago'),
             color: AppColors.amber,
             unread: true,
           ),
           const SizedBox(height: 10),
-          const _NoticeCard(
+          _NoticeCard(
             icon: Icons.cloud_done_outlined,
-            title: 'Audit synced',
-            body: 'Shwapno Super Shop was uploaded successfully.',
-            time: '34 min ago',
+            title: t('Audit synced'),
+            body: t('Shwapno Super Shop was uploaded successfully.'),
+            time: t('34 min ago'),
             color: AppColors.emerald,
             unread: true,
           ),
           const SizedBox(height: 10),
-          const _NoticeCard(
+          _NoticeCard(
             icon: Icons.trending_up_rounded,
-            title: 'Share improved',
-            body: 'Gulshan route gained 5.8% Square-facing share this week.',
-            time: '2 hours ago',
+            title: t('Share improved'),
+            body: t('Gulshan route gained 5.8% Square-facing share this week.'),
+            time: t('2 hours ago'),
             color: Color(0xFF38BDF8),
             unread: true,
           ),
           if (!_unreadOnly) ...[
             const SizedBox(height: 10),
-            const _NoticeCard(
+            _NoticeCard(
               icon: Icons.assignment_turned_in_outlined,
-              title: 'Daily target complete',
-              body: 'All 6 scheduled stores were visited yesterday.',
-              time: 'Yesterday',
+              title: t('Daily target complete'),
+              body: t('All 6 scheduled stores were visited yesterday.'),
+              time: t('Yesterday'),
               color: AppColors.inkMuted,
             ),
           ],
@@ -124,7 +126,7 @@ class _NoticeCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         title,
-                        style: const TextStyle(fontWeight: FontWeight.w900),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ),
                     if (unread)
@@ -139,7 +141,7 @@ class _NoticeCard extends StatelessWidget {
                 Text(
                   body,
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: AppFontSize.md,
                     height: 1.4,
                     color: AppColors.inkMuted,
                   ),
@@ -148,7 +150,7 @@ class _NoticeCard extends StatelessWidget {
                 Text(
                   time,
                   style: const TextStyle(
-                    fontSize: 10,
+                    fontSize: AppFontSize.xs,
                     color: AppColors.inkMuted,
                   ),
                 ),
@@ -171,7 +173,7 @@ class _SyncCenterScreenState extends State<SyncCenterScreen> {
   bool _retrying = false;
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Sync center')),
+    appBar: AppBar(title: Text(t('Sync center'))),
     body: ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
       children: [
@@ -182,7 +184,7 @@ class _SyncCenterScreenState extends State<SyncCenterScreen> {
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: const Color(0xFFA7F3D0)),
           ),
-          child: const Row(
+          child: Row(
             children: [
               Icon(Icons.wifi_rounded, color: AppColors.emeraldDark, size: 28),
               SizedBox(width: 13),
@@ -191,16 +193,16 @@ class _SyncCenterScreenState extends State<SyncCenterScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Online and ready',
+                      t('Online and ready'),
                       style: TextStyle(
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w600,
                         color: AppColors.emeraldDark,
                       ),
                     ),
                     Text(
-                      'Last successful sync • just now',
+                      t('Last successful sync • just now'),
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: AppFontSize.sm,
                         color: AppColors.emeraldDark,
                       ),
                     ),
@@ -211,23 +213,23 @@ class _SyncCenterScreenState extends State<SyncCenterScreen> {
           ),
         ),
         const SizedBox(height: 20),
-        const Row(
+        Row(
           children: [
             Expanded(
-              child: _SyncStat(value: '0', label: 'Pending'),
+              child: _SyncStat(value: '0', label: t('Pending')),
             ),
             SizedBox(width: 10),
             Expanded(
-              child: _SyncStat(value: '1', label: 'Needs retry', warning: true),
+              child: _SyncStat(value: '1', label: t('Needs retry'), warning: true),
             ),
             SizedBox(width: 10),
             Expanded(
-              child: _SyncStat(value: '24', label: 'Synced'),
+              child: _SyncStat(value: '24', label: t('Synced')),
             ),
           ],
         ),
         const SizedBox(height: 24),
-        const SectionTitle(title: 'Upload queue'),
+        SectionTitle(title: t('Upload queue')),
         const SizedBox(height: 10),
         Card(
           child: Padding(
@@ -240,25 +242,25 @@ class _SyncCenterScreenState extends State<SyncCenterScreen> {
                   child: ShelfArtwork(radius: 14),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Prince Bazar',
-                        style: TextStyle(fontWeight: FontWeight.w900),
+                        t('Prince Bazar'),
+                        style: TextStyle(fontWeight: FontWeight.w600),
                       ),
                       SizedBox(height: 3),
                       Text(
-                        '3 photos • 18.4 MB',
+                        t('3 photos • 18.4 MB'),
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: AppFontSize.sm,
                           color: AppColors.inkMuted,
                         ),
                       ),
                       SizedBox(height: 7),
                       StatusPill(
-                        label: 'UPLOAD FAILED',
+                        label: t('UPLOAD FAILED'),
                         color: Color(0xFFB45309),
                         background: Color(0xFFFEF3C7),
                       ),
@@ -282,7 +284,6 @@ class _SyncCenterScreenState extends State<SyncCenterScreen> {
         const SizedBox(height: 18),
         PrimaryButton(
           label: _retrying ? 'Retrying upload...' : 'Retry failed uploads',
-          icon: Icons.sync_rounded,
           onPressed: _retrying ? null : () => setState(() => _retrying = true),
         ),
       ],
@@ -308,15 +309,15 @@ class _SyncStat extends StatelessWidget {
           Text(
             value,
             style: TextStyle(
-              fontSize: 23,
-              fontWeight: FontWeight.w900,
+              fontSize: AppFontSize.xxl,
+              fontWeight: FontWeight.w600,
               color: warning ? const Color(0xFFB45309) : AppColors.navy,
             ),
           ),
           const SizedBox(height: 3),
           Text(
             label,
-            style: const TextStyle(fontSize: 10, color: AppColors.inkMuted),
+            style: const TextStyle(fontSize: AppFontSize.xs, color: AppColors.inkMuted),
           ),
         ],
       ),
@@ -337,7 +338,7 @@ class _ReportFiltersScreenState extends State<ReportFiltersScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Report filters'),
+      title: Text(t('Report filters')),
       actions: [
         TextButton(
           onPressed: () => setState(() {
@@ -347,7 +348,7 @@ class _ReportFiltersScreenState extends State<ReportFiltersScreen> {
               ..clear()
               ..add('All categories');
           }),
-          child: const Text('Reset'),
+          child: Text(t('Reset')),
         ),
       ],
     ),
@@ -359,11 +360,11 @@ class _ReportFiltersScreenState extends State<ReportFiltersScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
               children: [
-                const Text(
-                  'DATE RANGE',
+                Text(
+                  t('DATE RANGE'),
                   style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                    fontSize: AppFontSize.xs,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.inkMuted,
                     letterSpacing: .8,
                   ),
@@ -382,15 +383,15 @@ class _ReportFiltersScreenState extends State<ReportFiltersScreen> {
                     ),
                     title: Text(
                       item,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),
                 ),
                 const SizedBox(height: 18),
                 DropdownButtonFormField<String>(
                   initialValue: _area,
-                  decoration: const InputDecoration(
-                    labelText: 'Area',
+                  decoration: InputDecoration(
+                    labelText: t('Area'),
                     prefixIcon: Icon(Icons.location_on_outlined),
                   ),
                   items:
@@ -405,11 +406,11 @@ class _ReportFiltersScreenState extends State<ReportFiltersScreen> {
                   onChanged: (value) => setState(() => _area = value!),
                 ),
                 const SizedBox(height: 22),
-                const Text(
-                  'CATEGORIES',
+                Text(
+                  t('CATEGORIES'),
                   style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                    fontSize: AppFontSize.xs,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.inkMuted,
                     letterSpacing: .8,
                   ),
@@ -449,7 +450,7 @@ class _ReportFiltersScreenState extends State<ReportFiltersScreen> {
                 OutlinedButton.icon(
                   onPressed: () {},
                   icon: const Icon(Icons.file_download_outlined),
-                  label: const Text('Export report as PDF'),
+                  label: Text(t('Export report as PDF')),
                 ),
               ],
             ),
@@ -457,8 +458,7 @@ class _ReportFiltersScreenState extends State<ReportFiltersScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
             child: PrimaryButton(
-              label: 'Apply filters',
-              icon: Icons.check_rounded,
+              label: t('Apply filters'),
               onPressed: () => Navigator.of(context).pop(),
             ),
           ),
@@ -482,12 +482,12 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
   };
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('App permissions')),
+    appBar: AppBar(title: Text(t('App permissions'))),
     body: ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
       children: [
-        const Text(
-          'ShelfSight uses these permissions only while capturing and saving store audits.',
+        Text(
+          t('ShelfSight uses these permissions only while capturing and saving store audits.'),
           style: TextStyle(color: AppColors.inkMuted, height: 1.45),
         ),
         const SizedBox(height: 20),
@@ -508,7 +508,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                     ),
                     title: Text(
                       entry.key,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                     subtitle: Text(entry.value ? 'Allowed' : 'Not allowed'),
                   ),
@@ -517,9 +517,9 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
           ),
         ),
         const SizedBox(height: 18),
-        const StatusPill(
+        StatusPill(
           label:
-              'Changes shown here are UI-only until native permission handling is connected',
+              t('Changes shown here are UI-only until native permission handling is connected'),
           icon: Icons.info_outline_rounded,
           color: AppColors.inkMuted,
           background: AppColors.surfaceAlt,
@@ -533,32 +533,32 @@ class HelpSupportScreen extends StatelessWidget {
   const HelpSupportScreen({super.key});
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Help & support')),
+    appBar: AppBar(title: Text(t('Help & support'))),
     body: ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
       children: [
-        const TextField(
+        TextField(
           decoration: InputDecoration(
             prefixIcon: Icon(Icons.search_rounded),
-            hintText: 'Search help topics',
+            hintText: t('Search help topics'),
           ),
         ),
         const SizedBox(height: 20),
-        const SectionTitle(title: 'Common questions'),
+        SectionTitle(title: t('Common questions')),
         const SizedBox(height: 10),
-        const Card(
+        Card(
           child: Column(
             children: [
               ExpansionTile(
                 title: Text(
-                  'How should I capture a shelf?',
-                  style: TextStyle(fontWeight: FontWeight.w800),
+                  t('How should I capture a shelf?'),
+                  style: TextStyle(fontWeight: FontWeight.w600),
                 ),
                 children: [
                   Padding(
                     padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
                     child: Text(
-                      'Stand straight in front of the shelf, avoid glare, and capture one section at a time.',
+                      t('Stand straight in front of the shelf, avoid glare, and capture one section at a time.'),
                       style: TextStyle(color: AppColors.inkMuted),
                     ),
                   ),
@@ -567,14 +567,14 @@ class HelpSupportScreen extends StatelessWidget {
               Divider(height: 1),
               ExpansionTile(
                 title: Text(
-                  'Why is a product uncertain?',
-                  style: TextStyle(fontWeight: FontWeight.w800),
+                  t('Why is a product uncertain?'),
+                  style: TextStyle(fontWeight: FontWeight.w600),
                 ),
                 children: [
                   Padding(
                     padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
                     child: Text(
-                      'The logo may be hidden, blurred, or too small. Review the item and classify it manually.',
+                      t('The logo may be hidden, blurred, or too small. Review the item and classify it manually.'),
                       style: TextStyle(color: AppColors.inkMuted),
                     ),
                   ),
@@ -583,14 +583,14 @@ class HelpSupportScreen extends StatelessWidget {
               Divider(height: 1),
               ExpansionTile(
                 title: Text(
-                  'Can I work without internet?',
-                  style: TextStyle(fontWeight: FontWeight.w800),
+                  t('Can I work without internet?'),
+                  style: TextStyle(fontWeight: FontWeight.w600),
                 ),
                 children: [
                   Padding(
                     padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
                     child: Text(
-                      'Drafts can be saved locally and uploaded later from Sync Center.',
+                      t('Drafts can be saved locally and uploaded later from Sync Center.'),
                       style: TextStyle(color: AppColors.inkMuted),
                     ),
                   ),
@@ -601,8 +601,7 @@ class HelpSupportScreen extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         PrimaryButton(
-          label: 'Contact support',
-          icon: Icons.chat_bubble_outline_rounded,
+          label: t('Contact support'),
           onPressed: () {},
         ),
       ],
@@ -618,7 +617,7 @@ class ShelfViewerScreen extends StatelessWidget {
     appBar: AppBar(
       backgroundColor: const Color(0xFF050B14),
       foregroundColor: Colors.white,
-      title: const Text('Shelf photo', style: TextStyle(color: Colors.white)),
+      title: Text(t('Shelf photo'), style: TextStyle(color: Colors.white)),
       actions: [
         IconButton(onPressed: () {}, icon: const Icon(Icons.download_outlined)),
       ],
@@ -643,16 +642,16 @@ class ShelfViewerScreen extends StatelessWidget {
               color: Color(0xFF111827),
               borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
             ),
-            child: const Row(
+            child: Row(
               children: [
                 Expanded(
-                  child: _ViewerMetric(value: '126', label: 'Facings'),
+                  child: _ViewerMetric(value: '126', label: t('Facings')),
                 ),
                 Expanded(
-                  child: _ViewerMetric(value: '54', label: 'Square'),
+                  child: _ViewerMetric(value: '54', label: t('Square')),
                 ),
                 Expanded(
-                  child: _ViewerMetric(value: '7', label: 'Uncertain'),
+                  child: _ViewerMetric(value: '7', label: t('Uncertain')),
                 ),
               ],
             ),
@@ -674,11 +673,11 @@ class _ViewerMetric extends StatelessWidget {
         value,
         style: const TextStyle(
           color: Colors.white,
-          fontSize: 20,
-          fontWeight: FontWeight.w900,
+          fontSize: AppFontSize.xl,
+          fontWeight: FontWeight.w600,
         ),
       ),
-      Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+      Text(label, style: const TextStyle(color: Colors.white54, fontSize: AppFontSize.xs)),
     ],
   );
 }

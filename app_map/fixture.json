@@ -1,0 +1,1755 @@
+{
+ "outlet": {
+  "id": "a6a40f4bc955445599558fea95cacf31",
+  "code": "S-104",
+  "name": "Prince Bazar",
+  "name_bn": null,
+  "address": "Road 27, Gulshan 1",
+  "lat": 23.7882,
+  "lng": 90.4043,
+  "channel": "Grocery (Mudi)",
+  "channel_code": "GT-GROC",
+  "channel_id": "2e21767512a84b0e82c05d10043bf45a",
+  "channel_icon": "grocery",
+  "territory": "Banani\u2013Gulshan",
+  "class_code": "B",
+  "class_label": "Core",
+  "last_visit_at": null,
+  "open_recommendations": 2,
+  "is_verified": true,
+  "data_origin": "synthetic"
+ },
+ "store_type": {
+  "id": "29f683d4e7814deaa9595c65add51015",
+  "code": "MT-SS",
+  "name": "Super Shop",
+  "name_bn": "\u09b8\u09c1\u09aa\u09be\u09b0 \u09b6\u09aa",
+  "parent_id": "e7cbe10bd4d34a7c95516197f43997b9",
+  "path": "/mt/mt-ss/",
+  "description": "Chain supermarket (Shwapno, Meena Bazar, Agora \u2026)",
+  "is_active": true,
+  "is_store_type": true,
+  "sort_order": 4,
+  "icon": "supershop",
+  "units_per_facing": 6,
+  "parent": "Modern Trade",
+  "effective_units_per_facing": 6
+ },
+ "visit_report": "114111972f4e438ea77e3f70c23ab177",
+ "report_order": {
+  "id": "d3e3d98e0a8a466aafc4f25440ead094",
+  "outlet_id": "a6a40f4bc955445599558fea95cacf31",
+  "visit_id": "114111972f4e438ea77e3f70c23ab177",
+  "user_id": "e9e024f4d5664db688171475fc252d10",
+  "source": "auto",
+  "status": "confirmed",
+  "external_ref": "AUTO-114111972f4e438ea77e3f70c23ab177",
+  "order_date": "2026-10-11",
+  "created_at": "2026-10-11T08:48:59.413063",
+  "value": 1676.4,
+  "lines": [
+   {
+    "id": "276e8ff24413404883368ae011dd8dc1",
+    "product_id": "7ab02886bc814abfa6cd5052ae76a69c",
+    "sku": "SQ-JUI-OIL-200",
+    "name": "Jui Coconut Oil 200ml",
+    "brand": "Jui",
+    "quantity": 3,
+    "unit_price": 118.8,
+    "line_value": 356.4,
+    "suggested_quantity": 3,
+    "recommendation_id": null,
+    "sources": [
+     {
+      "source": "replenishment",
+      "quantity": 3,
+      "evidence": {
+       "units_in_window": 31,
+       "order_days": 13,
+       "window_days": 90
+      }
+     }
+    ],
+    "reasons": [
+     "Usual order: 3 (from 31 units over 13 orders)"
+    ]
+   },
+   {
+    "id": "48f5404d757f406a8c07fc350ada306c",
+    "product_id": "c50a503c4c994cd8a1e57f8cfa9d4585",
+    "sku": "SQ-JUI-OIL-100",
+    "name": "Jui Coconut Oil 100ml",
+    "brand": "Jui",
+    "quantity": 5,
+    "unit_price": 61.6,
+    "line_value": 308.0,
+    "suggested_quantity": 5,
+    "recommendation_id": null,
+    "sources": [
+     {
+      "source": "replenishment",
+      "quantity": 5,
+      "evidence": {
+       "units_in_window": 60,
+       "order_days": 13,
+       "window_days": 90
+      }
+     }
+    ],
+    "reasons": [
+     "Usual order: 5 (from 60 units over 13 orders)"
+    ]
+   },
+   {
+    "id": "e338b16cfea34bbcab9c18d0dcbc70f4",
+    "product_id": "2991b1360ba84c2aa5d2f6759b9ba399",
+    "sku": "SQ-CHK-DET-500",
+    "name": "Chaka Super White Detergent 500g",
+    "brand": "Chaka",
+    "quantity": 4,
+    "unit_price": 61.6,
+    "line_value": 246.4,
+    "suggested_quantity": 4,
+    "recommendation_id": null,
+    "sources": [
+     {
+      "source": "replenishment",
+      "quantity": 4,
+      "evidence": {
+       "units_in_window": 49,
+       "order_days": 13,
+       "window_days": 90
+      }
+     }
+    ],
+    "reasons": [
+     "Usual order: 4 (from 49 units over 13 orders)"
+    ]
+   },
+   {
+    "id": "5870af0ee3064af69f46f34a0623efa8",
+    "product_id": "c828ec39d3e34b119e2b6ea34b0340af",
+    "sku": "SQ-CHK-DET-1K",
+    "name": "Chaka Super White Detergent 1kg",
+    "brand": "Chaka",
+    "quantity": 2,
+    "unit_price": 118.8,
+    "line_value": 237.6,
+    "suggested_quantity": 2,
+    "recommendation_id": null,
+    "sources": [
+     {
+      "source": "replenishment",
+      "quantity": 2,
+      "evidence": {
+       "units_in_window": 22,
+       "order_days": 13,
+       "window_days": 90
+      }
+     }
+    ],
+    "reasons": [
+     "Usual order: 2 (from 22 units over 13 orders)"
+    ]
+   },
+   {
+    "id": "1edae4566a63485883c32bdef3812cf4",
+    "product_id": "e6219f51e57d48a4aa65e52c6730e95f",
+    "sku": "SQ-MER-SOAP-100",
+    "name": "Meril Milk & Rose Soap 100g",
+    "brand": "Meril",
+    "quantity": 5,
+    "unit_price": 39.6,
+    "line_value": 198.0,
+    "suggested_quantity": 5,
+    "recommendation_id": null,
+    "sources": [
+     {
+      "source": "replenishment",
+      "quantity": 5,
+      "evidence": {
+       "units_in_window": 62,
+       "order_days": 13,
+       "window_days": 90
+      }
+     }
+    ],
+    "reasons": [
+     "Usual order: 5 (from 62 units over 13 orders)"
+    ]
+   },
+   {
+    "id": "cb8b0628ce0947c8ab3e0f52bdf40165",
+    "product_id": "b54eaace3f864698b8d08020ac3545c5",
+    "sku": "SQ-MER-SHMP-180",
+    "name": "Meril Herbal Shampoo 180ml",
+    "brand": "Meril",
+    "quantity": 1,
+    "unit_price": 167.2,
+    "line_value": 167.2,
+    "suggested_quantity": 1,
+    "recommendation_id": null,
+    "sources": [
+     {
+      "source": "replenishment",
+      "quantity": 1,
+      "evidence": {
+       "units_in_window": 6,
+       "order_days": 13,
+       "window_days": 90
+      }
+     }
+    ],
+    "reasons": [
+     "Usual order: 1 (from 6 units over 13 orders)"
+    ]
+   },
+   {
+    "id": "53b6a28d022d45ae94ac46557c76501b",
+    "product_id": "84ede4e739cd46469023bbecc3ba37c0",
+    "sku": "SQ-SEP-HW-200",
+    "name": "Sepnil Hand Wash 200ml",
+    "brand": "Sepnil",
+    "quantity": 1,
+    "unit_price": 96.8,
+    "line_value": 96.8,
+    "suggested_quantity": 1,
+    "recommendation_id": null,
+    "sources": [
+     {
+      "source": "replenishment",
+      "quantity": 1,
+      "evidence": {
+       "units_in_window": 11,
+       "order_days": 13,
+       "window_days": 90
+      }
+     }
+    ],
+    "reasons": [
+     "Usual order: 1 (from 11 units over 13 orders)"
+    ]
+   },
+   {
+    "id": "95a5444a5bcc46fe93927b6c74d596bb",
+    "product_id": "6f3b350030cd47c38f6681ae93d619cb",
+    "sku": "SQ-SEP-HW-RF-170",
+    "name": "Sepnil Hand Wash Refill 170ml",
+    "brand": "Sepnil",
+    "quantity": 1,
+    "unit_price": 66.0,
+    "line_value": 66.0,
+    "suggested_quantity": 1,
+    "recommendation_id": null,
+    "sources": [
+     {
+      "source": "replenishment",
+      "quantity": 1,
+      "evidence": {
+       "units_in_window": 9,
+       "order_days": 13,
+       "window_days": 90
+      }
+     },
+     {
+      "source": "promotion",
+      "note": "active promotion applies"
+     }
+    ],
+    "reasons": [
+     "Usual order: 1 (from 9 units over 13 orders)",
+     "Active promotion applies"
+    ]
+   }
+  ],
+  "meta": {
+   "generator_version": "order-suggestion-2.0",
+   "mode": "confirm",
+   "shelf_visit_id": "114111972f4e438ea77e3f70c23ab177",
+   "units_per_facing": 6,
+   "skipped_without_trade_price": []
+  },
+  "editable": true,
+  "data_origin": "synthetic"
+ },
+ "review_visit": "c200ee3c31ee48b593dd7b7eb9611038",
+ "review_captures": [
+  "0d8217396db84e70a3afb829b4baa2f1"
+ ],
+ "sphere_capture": {
+  "id": "379501c32f334eee94beee6946c9dfb6",
+  "client_capture_id": "ff512955ad8049ffa15c3f8db3f943e1",
+  "visit_id": "c200ee3c31ee48b593dd7b7eb9611038",
+  "status": "analysed",
+  "area": "360\u00b0 photo sphere",
+  "category_id": null,
+  "quality": {
+   "width": 1264,
+   "height": 989,
+   "blur_score": 167.37,
+   "brightness": 87.16,
+   "acceptable": true,
+   "warnings": []
+  },
+  "quality_acceptable": true,
+  "duplicate_of": null,
+  "width": 1264,
+  "height": 989,
+  "uploaded_at": "2026-10-11T08:49:02.691725",
+  "image_url": "/v2/captures/379501c32f334eee94beee6946c9dfb6/image",
+  "inference": {
+   "id": "dfdba667229248bd8ce873f1262eca5f",
+   "status": "succeeded",
+   "latency_ms": 327,
+   "cost_usd": null,
+   "warnings": [
+    "Packs are named by visual similarity to pack shots of 88 catalogue products; close variants of one design can be confused, and a pack that resembles none of them is reported as not ours."
+   ],
+   "error": null,
+   "model": {
+    "version_id": "94c606bd571645e18054aae111b29ca6",
+    "version": "owlv2-b16+clip-b16@8be5639530",
+    "provider": "visual-lookup"
+   },
+   "annotated_url": "/v2/inferences/dfdba667229248bd8ce873f1262eca5f/annotated",
+   "detections_total": 29,
+   "needs_review": 17
+  },
+  "data_origin": "synthetic",
+  "kind": "sphere",
+  "sphere": {
+   "kind": "sphere",
+   "frames": 6,
+   "frames_joined": 6,
+   "stitched": true,
+   "yaw_span": 150.0,
+   "horizontal_degrees": 210.0,
+   "vertical_degrees": 164.3,
+   "note": null
+  },
+  "detections": [
+   {
+    "id": "6eb067c80fb0470ab99b8cd55f1c5c55",
+    "box": {
+     "x": 0.732818603515625,
+     "y": 0.4683120846748352,
+     "width": 0.05877685546875,
+     "height": 0.11739979684352875
+    },
+    "shelf_row": 2,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "competitor",
+     "product_id": null,
+     "manufacturer_id": null,
+     "confidence": 0.719
+    },
+    "final": {
+     "label": "competitor",
+     "product_id": null,
+     "manufacturer_id": null
+    },
+    "needs_review": true,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.737,
+     "colour": 0.18,
+     "detector": 0.494,
+     "alternatives": [
+      {
+       "product_id": "52a3b802776b4dd79520db4f21710ad0",
+       "similarity": 0.737
+      },
+      {
+       "product_id": "8932c46a169a41ebab224abb1698c0e9",
+       "similarity": 0.737
+      },
+      {
+       "product_id": "e8ca9cdbad3d4aef9c2d93f9947dd4dc",
+       "similarity": 0.734
+      }
+     ],
+     "not_ours": true,
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "ebd5f3f1764f491da4dcf077b4b60287",
+    "box": {
+     "x": 0.581146240234375,
+     "y": 0.4417508542537689,
+     "width": 0.06915283203125,
+     "height": 0.14493609964847565
+    },
+    "shelf_row": 2,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "own",
+     "product_id": "ec92803ba5e540e189b6bf3128bf8462",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050",
+     "confidence": 0.47
+    },
+    "final": {
+     "label": "own",
+     "product_id": "ec92803ba5e540e189b6bf3128bf8462",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050"
+    },
+    "needs_review": true,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.766,
+     "colour": 0.255,
+     "detector": 0.49,
+     "alternatives": [
+      {
+       "product_id": "ec92803ba5e540e189b6bf3128bf8462",
+       "similarity": 0.766
+      },
+      {
+       "product_id": "52a3b802776b4dd79520db4f21710ad0",
+       "similarity": 0.763
+      },
+      {
+       "product_id": "c298d253aa4f44b09568bfe80b334e33",
+       "similarity": 0.76
+      }
+     ],
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "34a847a934e94331935a9528523a39d2",
+    "box": {
+     "x": 0.7882537841796875,
+     "y": 0.4694431722164154,
+     "width": 0.060211181640625,
+     "height": 0.1157616600394249
+    },
+    "shelf_row": 2,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "competitor",
+     "product_id": null,
+     "manufacturer_id": null,
+     "confidence": 0.763
+    },
+    "final": {
+     "label": "competitor",
+     "product_id": null,
+     "manufacturer_id": null
+    },
+    "needs_review": false,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.723,
+     "colour": 0.242,
+     "detector": 0.479,
+     "alternatives": [
+      {
+       "product_id": "ec92803ba5e540e189b6bf3128bf8462",
+       "similarity": 0.723
+      },
+      {
+       "product_id": "52a3b802776b4dd79520db4f21710ad0",
+       "similarity": 0.705
+      },
+      {
+       "product_id": "e8ca9cdbad3d4aef9c2d93f9947dd4dc",
+       "similarity": 0.7
+      }
+     ],
+     "not_ours": true,
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "baedfc7a6d114317b5effe52f679dbbc",
+    "box": {
+     "x": 0.64959716796875,
+     "y": 0.40173351764678955,
+     "width": 0.0416259765625,
+     "height": 0.18253523111343384
+    },
+    "shelf_row": 2,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "competitor",
+     "product_id": null,
+     "manufacturer_id": null,
+     "confidence": 0.5
+    },
+    "final": {
+     "label": "competitor",
+     "product_id": null,
+     "manufacturer_id": null
+    },
+    "needs_review": true,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.824,
+     "colour": 0.206,
+     "detector": 0.474,
+     "alternatives": [
+      {
+       "product_id": "9a41d504a58b4f91abfebfd2bc496f2b",
+       "similarity": 0.824
+      },
+      {
+       "product_id": "e8ca9cdbad3d4aef9c2d93f9947dd4dc",
+       "similarity": 0.821
+      },
+      {
+       "product_id": "52a3b802776b4dd79520db4f21710ad0",
+       "similarity": 0.817
+      }
+     ],
+     "not_ours": true,
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "4b9573587a1e4b15bc80e2d9bb0cf570",
+    "box": {
+     "x": 0.516387939453125,
+     "y": 0.4463922381401062,
+     "width": 0.06585693359375,
+     "height": 0.14189383387565613
+    },
+    "shelf_row": 2,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "own",
+     "product_id": "ec92803ba5e540e189b6bf3128bf8462",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050",
+     "confidence": 0.862
+    },
+    "final": {
+     "label": "own",
+     "product_id": "ec92803ba5e540e189b6bf3128bf8462",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050"
+    },
+    "needs_review": false,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.827,
+     "colour": 0.267,
+     "detector": 0.472,
+     "alternatives": [
+      {
+       "product_id": "ec92803ba5e540e189b6bf3128bf8462",
+       "similarity": 0.827
+      },
+      {
+       "product_id": "0119e1ec8ceb4d7eb9c7f11a9c116357",
+       "similarity": 0.785
+      },
+      {
+       "product_id": "69a5887481f2448382de5af2dd7d8b50",
+       "similarity": 0.784
+      }
+     ],
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "30e48dbdb2c04837bb657aa21a39333d",
+    "box": {
+     "x": 0.6900634765625,
+     "y": 0.40282562375068665,
+     "width": 0.039794921875,
+     "height": 0.18035104870796204
+    },
+    "shelf_row": 2,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "competitor",
+     "product_id": null,
+     "manufacturer_id": null,
+     "confidence": 0.5
+    },
+    "final": {
+     "label": "competitor",
+     "product_id": null,
+     "manufacturer_id": null
+    },
+    "needs_review": true,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.856,
+     "colour": 0.199,
+     "detector": 0.459,
+     "alternatives": [
+      {
+       "product_id": "9a41d504a58b4f91abfebfd2bc496f2b",
+       "similarity": 0.856
+      },
+      {
+       "product_id": "ec92803ba5e540e189b6bf3128bf8462",
+       "similarity": 0.823
+      },
+      {
+       "product_id": "69a5887481f2448382de5af2dd7d8b50",
+       "similarity": 0.814
+      }
+     ],
+     "not_ours": true,
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "f4a13f9200da4df991bc330d9928054e",
+    "box": {
+     "x": 0.13482666015625,
+     "y": 0.548541784286499,
+     "width": 0.0755615234375,
+     "height": 0.1553889662027359
+    },
+    "shelf_row": 3,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "competitor",
+     "product_id": null,
+     "manufacturer_id": null,
+     "confidence": 0.849
+    },
+    "final": {
+     "label": "competitor",
+     "product_id": null,
+     "manufacturer_id": null
+    },
+    "needs_review": false,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.714,
+     "colour": 0.208,
+     "detector": 0.441,
+     "alternatives": [
+      {
+       "product_id": "2ebb25619adf4d3ab4cea062cd71a92c",
+       "similarity": 0.714
+      },
+      {
+       "product_id": "87fc7ae09e0544b688de04ec8e017144",
+       "similarity": 0.598
+      },
+      {
+       "product_id": "52a3b802776b4dd79520db4f21710ad0",
+       "similarity": 0.587
+      }
+     ],
+     "not_ours": true,
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "e803e68b70ac4310ab3a93efac5d56aa",
+    "box": {
+     "x": 0.13690185546875,
+     "y": 0.6914497017860413,
+     "width": 0.0953369140625,
+     "height": 0.22091443836688995
+    },
+    "shelf_row": 3,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "competitor",
+     "product_id": null,
+     "manufacturer_id": null,
+     "confidence": 0.9
+    },
+    "final": {
+     "label": "competitor",
+     "product_id": null,
+     "manufacturer_id": null
+    },
+    "needs_review": false,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.692,
+     "colour": 0.289,
+     "detector": 0.441,
+     "alternatives": [
+      {
+       "product_id": "ec92803ba5e540e189b6bf3128bf8462",
+       "similarity": 0.692
+      },
+      {
+       "product_id": "2ebb25619adf4d3ab4cea062cd71a92c",
+       "similarity": 0.67
+      },
+      {
+       "product_id": "3105346b0ec84f449106842b04d15433",
+       "similarity": 0.667
+      }
+     ],
+     "not_ours": true,
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "d13b8cf7c42c4e71911c717b85b3a27b",
+    "box": {
+     "x": 0.692901611328125,
+     "y": 0.6355190277099609,
+     "width": 0.06732177734375,
+     "height": 0.16927412152290344
+    },
+    "shelf_row": 3,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "own",
+     "product_id": "c78c3c39ab24435c9fd8a9198af20bae",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050",
+     "confidence": 0.741
+    },
+    "final": {
+     "label": "own",
+     "product_id": "c78c3c39ab24435c9fd8a9198af20bae",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050"
+    },
+    "needs_review": true,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.766,
+     "colour": 0.578,
+     "detector": 0.429,
+     "alternatives": [
+      {
+       "product_id": "c78c3c39ab24435c9fd8a9198af20bae",
+       "similarity": 0.766
+      },
+      {
+       "product_id": "52a3b802776b4dd79520db4f21710ad0",
+       "similarity": 0.736
+      },
+      {
+       "product_id": "e4fb23b6d8d2407fab6b0f891834555e",
+       "similarity": 0.733
+      }
+     ],
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "aaf69541fab3467c9104987b1d5767fe",
+    "box": {
+     "x": 0.438995361328125,
+     "y": 0.24607153236865997,
+     "width": 0.08587646484375,
+     "height": 0.1574951410293579
+    },
+    "shelf_row": 1,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "own",
+     "product_id": "0ec064557a474f278da4778926e6921d",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050",
+     "confidence": 0.653
+    },
+    "final": {
+     "label": "own",
+     "product_id": "0ec064557a474f278da4778926e6921d",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050"
+    },
+    "needs_review": true,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.825,
+     "colour": 0.494,
+     "detector": 0.406,
+     "alternatives": [
+      {
+       "product_id": "0ec064557a474f278da4778926e6921d",
+       "similarity": 0.825
+      },
+      {
+       "product_id": "348c967db0aa48fab93f756f230d74b1",
+       "similarity": 0.825
+      },
+      {
+       "product_id": "4d8f8f2d6f42400b92c44e441939a0ec",
+       "similarity": 0.823
+      }
+     ],
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "a0327a6c29614b0f889ebdbf4213e8df",
+    "box": {
+     "x": 0.638458251953125,
+     "y": 0.6698029041290283,
+     "width": 0.06292724609375,
+     "height": 0.12941280007362366
+    },
+    "shelf_row": 3,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "own",
+     "product_id": "3105346b0ec84f449106842b04d15433",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050",
+     "confidence": 0.798
+    },
+    "final": {
+     "label": "own",
+     "product_id": "3105346b0ec84f449106842b04d15433",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050"
+    },
+    "needs_review": false,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.808,
+     "colour": 0.397,
+     "detector": 0.405,
+     "alternatives": [
+      {
+       "product_id": "3105346b0ec84f449106842b04d15433",
+       "similarity": 0.808
+      },
+      {
+       "product_id": "9a41d504a58b4f91abfebfd2bc496f2b",
+       "similarity": 0.799
+      },
+      {
+       "product_id": "69a5887481f2448382de5af2dd7d8b50",
+       "similarity": 0.788
+      }
+     ],
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "5e68f0a626b440d482e737c68a700145",
+    "box": {
+     "x": 0.210479736328125,
+     "y": 0.721092164516449,
+     "width": 0.08587646484375,
+     "height": 0.18908777832984924
+    },
+    "shelf_row": 3,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "competitor",
+     "product_id": null,
+     "manufacturer_id": null,
+     "confidence": 0.9
+    },
+    "final": {
+     "label": "competitor",
+     "product_id": null,
+     "manufacturer_id": null
+    },
+    "needs_review": false,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.678,
+     "colour": 0.33,
+     "detector": 0.379,
+     "alternatives": [
+      {
+       "product_id": "550d8647f0d442fca1b0c21f4d4e8684",
+       "similarity": 0.678
+      },
+      {
+       "product_id": "ec92803ba5e540e189b6bf3128bf8462",
+       "similarity": 0.676
+      },
+      {
+       "product_id": "3105346b0ec84f449106842b04d15433",
+       "similarity": 0.672
+      }
+     ],
+     "not_ours": true,
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "cda2ca5f29844fdbb34c01c2dcd92e66",
+    "box": {
+     "x": 0.41949462890625,
+     "y": 0.4441300630569458,
+     "width": 0.0633544921875,
+     "height": 0.14517010748386383
+    },
+    "shelf_row": 2,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "own",
+     "product_id": "0f65680d5ec84c72a9992045cd9112a4",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050",
+     "confidence": 0.578
+    },
+    "final": {
+     "label": "own",
+     "product_id": "0f65680d5ec84c72a9992045cd9112a4",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050"
+    },
+    "needs_review": true,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.769,
+     "colour": 0.293,
+     "detector": 0.378,
+     "alternatives": [
+      {
+       "product_id": "0f65680d5ec84c72a9992045cd9112a4",
+       "similarity": 0.769
+      },
+      {
+       "product_id": "2598ff9b0d9f4ce8a500ab44a08e9832",
+       "similarity": 0.76
+      },
+      {
+       "product_id": "b72296cc0a2e4d1192cfc208eb23d685",
+       "similarity": 0.759
+      }
+     ],
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "f869e6e7419e42caac2b3e33ae2858a5",
+    "box": {
+     "x": 0.522216796875,
+     "y": 0.24068908393383026,
+     "width": 0.10107421875,
+     "height": 0.15515494346618652
+    },
+    "shelf_row": 1,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "own",
+     "product_id": "318045a42ed848859b1ba44beff1eefa",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050",
+     "confidence": 0.67
+    },
+    "final": {
+     "label": "own",
+     "product_id": "318045a42ed848859b1ba44beff1eefa",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050"
+    },
+    "needs_review": true,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.861,
+     "colour": 0.59,
+     "detector": 0.375,
+     "alternatives": [
+      {
+       "product_id": "318045a42ed848859b1ba44beff1eefa",
+       "similarity": 0.861
+      },
+      {
+       "product_id": "0ec064557a474f278da4778926e6921d",
+       "similarity": 0.86
+      },
+      {
+       "product_id": "348c967db0aa48fab93f756f230d74b1",
+       "similarity": 0.858
+      }
+     ],
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "440782fcb42f4aa7b85f7ee01daf8bda",
+    "box": {
+     "x": 0.46636962890625,
+     "y": 0.43582236766815186,
+     "width": 0.0531005859375,
+     "height": 0.15055255591869354
+    },
+    "shelf_row": 2,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "competitor",
+     "product_id": null,
+     "manufacturer_id": null,
+     "confidence": 0.5
+    },
+    "final": {
+     "label": "competitor",
+     "product_id": null,
+     "manufacturer_id": null
+    },
+    "needs_review": true,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.777,
+     "colour": 0.187,
+     "detector": 0.373,
+     "alternatives": [
+      {
+       "product_id": "ec92803ba5e540e189b6bf3128bf8462",
+       "similarity": 0.777
+      },
+      {
+       "product_id": "3105346b0ec84f449106842b04d15433",
+       "similarity": 0.766
+      },
+      {
+       "product_id": "2ebb25619adf4d3ab4cea062cd71a92c",
+       "similarity": 0.751
+      }
+     ],
+     "not_ours": true,
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "9e1e55f65fef4fa393c261fca176047e",
+    "box": {
+     "x": 0.483917236328125,
+     "y": 0.6224139332771301,
+     "width": 0.09466552734375,
+     "height": 0.16053739190101624
+    },
+    "shelf_row": 3,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "own",
+     "product_id": "b5138bc46fd64319967a3d8f4a671a2e",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050",
+     "confidence": 0.683
+    },
+    "final": {
+     "label": "own",
+     "product_id": "b5138bc46fd64319967a3d8f4a671a2e",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050"
+    },
+    "needs_review": true,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.758,
+     "colour": 0.287,
+     "detector": 0.373,
+     "alternatives": [
+      {
+       "product_id": "b5138bc46fd64319967a3d8f4a671a2e",
+       "similarity": 0.758
+      },
+      {
+       "product_id": "64974dba4c7e4afc8ec334ccd158db6c",
+       "similarity": 0.704
+      },
+      {
+       "product_id": "b44c08d325bb459aaf92247f2e14660e",
+       "similarity": 0.698
+      }
+     ],
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "006c3f1a3cf74db192e6dcce2f5a286e",
+    "box": {
+     "x": 0.56927490234375,
+     "y": 0.6348949670791626,
+     "width": 0.0948486328125,
+     "height": 0.154296875
+    },
+    "shelf_row": 3,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "competitor",
+     "product_id": null,
+     "manufacturer_id": null,
+     "confidence": 0.534
+    },
+    "final": {
+     "label": "competitor",
+     "product_id": null,
+     "manufacturer_id": null
+    },
+    "needs_review": true,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.751,
+     "colour": 0.219,
+     "detector": 0.36,
+     "alternatives": [
+      {
+       "product_id": "64974dba4c7e4afc8ec334ccd158db6c",
+       "similarity": 0.751
+      },
+      {
+       "product_id": "b44c08d325bb459aaf92247f2e14660e",
+       "similarity": 0.737
+      },
+      {
+       "product_id": "3105346b0ec84f449106842b04d15433",
+       "similarity": 0.709
+      }
+     ],
+     "not_ours": true,
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "108e1d5a007c42fda355d88491b13cfd",
+    "box": {
+     "x": 0.365234375,
+     "y": 0.27399787306785583,
+     "width": 0.07763671875,
+     "height": 0.13970965147018433
+    },
+    "shelf_row": 1,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "own",
+     "product_id": "fb1f9f10be8049bcaef4fcb28efaa61b",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050",
+     "confidence": 0.574
+    },
+    "final": {
+     "label": "own",
+     "product_id": "fb1f9f10be8049bcaef4fcb28efaa61b",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050"
+    },
+    "needs_review": true,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.768,
+     "colour": 0.412,
+     "detector": 0.358,
+     "alternatives": [
+      {
+       "product_id": "fb1f9f10be8049bcaef4fcb28efaa61b",
+       "similarity": 0.768
+      },
+      {
+       "product_id": "84a6ce65cb8f44cba0c848f6468464d9",
+       "similarity": 0.763
+      },
+      {
+       "product_id": "4f81371e592d4f7eb34598311e6489ad",
+       "similarity": 0.76
+      }
+     ],
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "078be53468984e219a952027e9149751",
+    "box": {
+     "x": 0.759552001953125,
+     "y": 0.6530705094337463,
+     "width": 0.09515380859375,
+     "height": 0.1641256958246231
+    },
+    "shelf_row": 3,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "competitor",
+     "product_id": "0b981ab7e2144192a82b66946a45be9a",
+     "manufacturer_id": "73d002b1b71245b59a4a8c7adea41eac",
+     "confidence": 0.841
+    },
+    "final": {
+     "label": "competitor",
+     "product_id": "0b981ab7e2144192a82b66946a45be9a",
+     "manufacturer_id": "73d002b1b71245b59a4a8c7adea41eac"
+    },
+    "needs_review": false,
+    "verification": "unverified",
+    "evidence": {
+     "method": "brand",
+     "similarity": 0.725,
+     "colour": 0.272,
+     "detector": 0.349,
+     "alternatives": [
+      {
+       "product_id": "ec92803ba5e540e189b6bf3128bf8462",
+       "similarity": 0.725
+      },
+      {
+       "product_id": "3105346b0ec84f449106842b04d15433",
+       "similarity": 0.722
+      },
+      {
+       "product_id": "4f81371e592d4f7eb34598311e6489ad",
+       "similarity": 0.715
+      }
+     ],
+     "brand": "ShadBari",
+     "brand_probability": 0.841,
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "721741333be9464c81244098dee4f225",
+    "box": {
+     "x": 0.6215972900390625,
+     "y": 0.2504009008407593,
+     "width": 0.059539794921875,
+     "height": 0.13354714214801788
+    },
+    "shelf_row": 1,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "own",
+     "product_id": "4d8f8f2d6f42400b92c44e441939a0ec",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050",
+     "confidence": 0.812
+    },
+    "final": {
+     "label": "own",
+     "product_id": "4d8f8f2d6f42400b92c44e441939a0ec",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050"
+    },
+    "needs_review": false,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.786,
+     "colour": 0.3,
+     "detector": 0.348,
+     "alternatives": [
+      {
+       "product_id": "4d8f8f2d6f42400b92c44e441939a0ec",
+       "similarity": 0.786
+      },
+      {
+       "product_id": "aac8e95e0ccc4965a61324653e977521",
+       "similarity": 0.763
+      },
+      {
+       "product_id": "318045a42ed848859b1ba44beff1eefa",
+       "similarity": 0.762
+      }
+     ],
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "4a5be60557c449e4b2d0c96de186e42f",
+    "box": {
+     "x": 0.40362548828125,
+     "y": 0.6146913170814514,
+     "width": 0.0965576171875,
+     "height": 0.15726111829280853
+    },
+    "shelf_row": 3,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "competitor",
+     "product_id": null,
+     "manufacturer_id": null,
+     "confidence": 0.5
+    },
+    "final": {
+     "label": "competitor",
+     "product_id": null,
+     "manufacturer_id": null
+    },
+    "needs_review": true,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.837,
+     "colour": 0.181,
+     "detector": 0.338,
+     "alternatives": [
+      {
+       "product_id": "e2afb5a0cefb410e9e0390801cf76cb8",
+       "similarity": 0.837
+      },
+      {
+       "product_id": "4f81371e592d4f7eb34598311e6489ad",
+       "similarity": 0.828
+      },
+      {
+       "product_id": "608ede6de2724ef4a17043635c092387",
+       "similarity": 0.827
+      }
+     ],
+     "not_ours": true,
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "aa2413a9d9d444d6ae306989d922f683",
+    "box": {
+     "x": 0.345458984375,
+     "y": 0.6109859943389893,
+     "width": 0.0751953125,
+     "height": 0.14719828963279724
+    },
+    "shelf_row": 3,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "own",
+     "product_id": "078149abf2a84fb5852ff57ab83c1e4e",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050",
+     "confidence": 0.613
+    },
+    "final": {
+     "label": "own",
+     "product_id": "078149abf2a84fb5852ff57ab83c1e4e",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050"
+    },
+    "needs_review": true,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.868,
+     "colour": 0.248,
+     "detector": 0.333,
+     "alternatives": [
+      {
+       "product_id": "078149abf2a84fb5852ff57ab83c1e4e",
+       "similarity": 0.868
+      },
+      {
+       "product_id": "f2801cbceb464b9ea64ff0a380beb326",
+       "similarity": 0.862
+      },
+      {
+       "product_id": "4f81371e592d4f7eb34598311e6489ad",
+       "similarity": 0.857
+      }
+     ],
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "c657bb5a82fc483099f724f86cadbafb",
+    "box": {
+     "x": 0.677825927734375,
+     "y": 0.23292744159698486,
+     "width": 0.09552001953125,
+     "height": 0.14415602385997772
+    },
+    "shelf_row": 1,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "own",
+     "product_id": "e20c7d32562b49a982de77276c46f71c",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050",
+     "confidence": 0.694
+    },
+    "final": {
+     "label": "own",
+     "product_id": "e20c7d32562b49a982de77276c46f71c",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050"
+    },
+    "needs_review": true,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.771,
+     "colour": 0.331,
+     "detector": 0.333,
+     "alternatives": [
+      {
+       "product_id": "e20c7d32562b49a982de77276c46f71c",
+       "similarity": 0.771
+      },
+      {
+       "product_id": "5811c4929b544443a4562f8c4c5bf483",
+       "similarity": 0.756
+      },
+      {
+       "product_id": "5a1e31d583604bdc8ca5a6e4ba263ea0",
+       "similarity": 0.749
+      }
+     ],
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "206b93699d5a4efb95225fdd8be43154",
+    "box": {
+     "x": 0.278961181640625,
+     "y": 0.601976215839386,
+     "width": 0.08660888671875,
+     "height": 0.15024054050445557
+    },
+    "shelf_row": 3,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "own",
+     "product_id": "f2801cbceb464b9ea64ff0a380beb326",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050",
+     "confidence": 0.724
+    },
+    "final": {
+     "label": "own",
+     "product_id": "f2801cbceb464b9ea64ff0a380beb326",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050"
+    },
+    "needs_review": true,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.869,
+     "colour": 0.493,
+     "detector": 0.333,
+     "alternatives": [
+      {
+       "product_id": "f2801cbceb464b9ea64ff0a380beb326",
+       "similarity": 0.869
+      },
+      {
+       "product_id": "e2afb5a0cefb410e9e0390801cf76cb8",
+       "similarity": 0.863
+      },
+      {
+       "product_id": "4f81371e592d4f7eb34598311e6489ad",
+       "similarity": 0.863
+      }
+     ],
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "c12bc55bf40c4fb5b6678be404e0a372",
+    "box": {
+     "x": 0.280792236328125,
+     "y": 0.26483210921287537,
+     "width": 0.09222412109375,
+     "height": 0.15804119408130646
+    },
+    "shelf_row": 1,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "own",
+     "product_id": "608ede6de2724ef4a17043635c092387",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050",
+     "confidence": 0.831
+    },
+    "final": {
+     "label": "own",
+     "product_id": "608ede6de2724ef4a17043635c092387",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050"
+    },
+    "needs_review": false,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.871,
+     "colour": 0.614,
+     "detector": 0.332,
+     "alternatives": [
+      {
+       "product_id": "608ede6de2724ef4a17043635c092387",
+       "similarity": 0.871
+      },
+      {
+       "product_id": "5811c4929b544443a4562f8c4c5bf483",
+       "similarity": 0.854
+      },
+      {
+       "product_id": "ae4f16fa11dc44fd9ed1d70202d6aeba",
+       "similarity": 0.853
+      }
+     ],
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "4c9c0b917bab4973940877cbd1d2eb9c",
+    "box": {
+     "x": 0.76519775390625,
+     "y": 0.21307477355003357,
+     "width": 0.0994873046875,
+     "height": 0.15484291315078735
+    },
+    "shelf_row": 1,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "competitor",
+     "product_id": "6c802ad40e0d40e4a8754d2b8edbe24f",
+     "manufacturer_id": "8945882409064a838f0e41e5bb619b1e",
+     "confidence": 0.973
+    },
+    "final": {
+     "label": "competitor",
+     "product_id": "6c802ad40e0d40e4a8754d2b8edbe24f",
+     "manufacturer_id": "8945882409064a838f0e41e5bb619b1e"
+    },
+    "needs_review": false,
+    "verification": "unverified",
+    "evidence": {
+     "method": "brand",
+     "brand": "Jhalika",
+     "brand_probability": 0.973,
+     "detector": 0.323,
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "3c6b8f2852ac424c93534097cd87ad0a",
+    "box": {
+     "x": 0.343048095703125,
+     "y": 0.44120481610298157,
+     "width": 0.08050537109375,
+     "height": 0.1466522365808487
+    },
+    "shelf_row": 2,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "own",
+     "product_id": "608ede6de2724ef4a17043635c092387",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050",
+     "confidence": 0.857
+    },
+    "final": {
+     "label": "own",
+     "product_id": "608ede6de2724ef4a17043635c092387",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050"
+    },
+    "needs_review": false,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.848,
+     "colour": 0.3,
+     "detector": 0.313,
+     "alternatives": [
+      {
+       "product_id": "608ede6de2724ef4a17043635c092387",
+       "similarity": 0.848
+      },
+      {
+       "product_id": "6944ac408ad94271bb6390d9d3da462c",
+       "similarity": 0.83
+      },
+      {
+       "product_id": "06a5f20f127242cb86706e95e012649c",
+       "similarity": 0.828
+      }
+     ],
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "abe5cde33b1642e8b71f887fa6c590b8",
+    "box": {
+     "x": 0.282318115234375,
+     "y": 0.4494344890117645,
+     "width": 0.06915283203125,
+     "height": 0.14017769694328308
+    },
+    "shelf_row": 2,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "own",
+     "product_id": "ec92803ba5e540e189b6bf3128bf8462",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050",
+     "confidence": 0.686
+    },
+    "final": {
+     "label": "own",
+     "product_id": "ec92803ba5e540e189b6bf3128bf8462",
+     "manufacturer_id": "87d3d4b95dc9452189d8069d95cc9050"
+    },
+    "needs_review": true,
+    "verification": "unverified",
+    "evidence": {
+     "method": "visual",
+     "similarity": 0.785,
+     "colour": 0.254,
+     "detector": 0.288,
+     "alternatives": [
+      {
+       "product_id": "ec92803ba5e540e189b6bf3128bf8462",
+       "similarity": 0.785
+      },
+      {
+       "product_id": "69a5887481f2448382de5af2dd7d8b50",
+       "similarity": 0.769
+      },
+      {
+       "product_id": "d121739f64364e1d9afba39f15039cfc",
+       "similarity": 0.752
+      }
+     ],
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   },
+   {
+    "id": "072e4a3705024b78b0b8ba1fc1546a19",
+    "box": {
+     "x": 0.761444091796875,
+     "y": 0.8474627137184143,
+     "width": 0.08648681640625,
+     "height": 0.04243554174900055
+    },
+    "shelf_row": 3,
+    "shelf_rows_total": 3,
+    "predicted": {
+     "label": "competitor",
+     "product_id": "65a4d154074b4a6d8f7ef7317ef3e7e6",
+     "manufacturer_id": "2b79d7dd27af41acb17cf565d866a84e",
+     "confidence": 0.754
+    },
+    "final": {
+     "label": "competitor",
+     "product_id": "65a4d154074b4a6d8f7ef7317ef3e7e6",
+     "manufacturer_id": "2b79d7dd27af41acb17cf565d866a84e"
+    },
+    "needs_review": false,
+    "verification": "unverified",
+    "evidence": {
+     "method": "brand",
+     "similarity": 0.682,
+     "colour": 0.19,
+     "detector": 0.276,
+     "alternatives": [
+      {
+       "product_id": "2ebb25619adf4d3ab4cea062cd71a92c",
+       "similarity": 0.682
+      },
+      {
+       "product_id": "52a3b802776b4dd79520db4f21710ad0",
+       "similarity": 0.573
+      },
+      {
+       "product_id": "87fc7ae09e0544b688de04ec8e017144",
+       "similarity": 0.555
+      }
+     ],
+     "brand": "Pepsodent",
+     "brand_probability": 0.754,
+     "cleaned": [
+      "colours",
+      "moire"
+     ],
+     "screen_photo": true
+    }
+   }
+  ]
+ },
+ "capture_visit": "388dc69e33064593a5c926dc4252d33d"
+}

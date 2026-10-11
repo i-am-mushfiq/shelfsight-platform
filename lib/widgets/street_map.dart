@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
+
 import '../models/session.dart';
 import '../theme/app_theme.dart';
 
@@ -64,7 +66,8 @@ class StreetMapState extends State<StreetMap>
     final user = MapProjection.project(SimulatedGps.lat, SimulatedGps.lng);
     const scale = 1.15;
     final cx = viewport.width / 2;
-    final cy = widget.topInset +
+    final cy =
+        widget.topInset +
         (viewport.height - widget.topInset - widget.bottomInset) / 2;
     _controller.value = Matrix4.identity()
       ..translateByDouble(cx - user.dx * scale, cy - user.dy * scale, 0, 1)
@@ -84,7 +87,7 @@ class StreetMapState extends State<StreetMap>
         }
         final user = MapProjection.project(SimulatedGps.lat, SimulatedGps.lng);
         return Semantics(
-          label: 'Street map showing your location and assigned shops',
+          label: t('Street map showing your location and assigned shops'),
           child: InteractiveViewer(
             transformationController: _controller,
             constrained: false,
@@ -235,8 +238,24 @@ class _StreetPainter extends CustomPainter {
   static const _majorCasing = Color(0xFFE0B64C);
 
   // Road polylines in map pixels. Deterministic "Banani-like" grid.
-  static const _verticalMinor = [90.0, 230.0, 380.0, 520.0, 660.0, 810.0, 960.0];
-  static const _horizontalMinor = [80.0, 210.0, 340.0, 470.0, 610.0, 750.0, 880.0];
+  static const _verticalMinor = [
+    90.0,
+    230.0,
+    380.0,
+    520.0,
+    660.0,
+    810.0,
+    960.0,
+  ];
+  static const _horizontalMinor = [
+    80.0,
+    210.0,
+    340.0,
+    470.0,
+    610.0,
+    750.0,
+    880.0,
+  ];
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -257,7 +276,12 @@ class _StreetPainter extends CustomPainter {
     final ys = [0.0, ..._horizontalMinor, size.height];
     for (var i = 0; i < xs.length - 1; i++) {
       for (var j = 0; j < ys.length - 1; j++) {
-        final r = Rect.fromLTRB(xs[i] + 8, ys[j] + 8, xs[i + 1] - 8, ys[j + 1] - 8);
+        final r = Rect.fromLTRB(
+          xs[i] + 8,
+          ys[j] + 8,
+          xs[i + 1] - 8,
+          ys[j + 1] - 8,
+        );
         if (r.width < 20 || r.height < 20) continue;
         final isPark = (i == 3 && j == 3) || (i == 1 && j == 5);
         canvas.drawRRect(
@@ -268,8 +292,10 @@ class _StreetPainter extends CustomPainter {
         for (var k = 0; k < 7; k++) {
           final bw = 22 + rng.nextDouble() * 34;
           final bh = 18 + rng.nextDouble() * 30;
-          final bx = r.left + 6 + rng.nextDouble() * math.max(1, r.width - bw - 12);
-          final by = r.top + 6 + rng.nextDouble() * math.max(1, r.height - bh - 12);
+          final bx =
+              r.left + 6 + rng.nextDouble() * math.max(1, r.width - bw - 12);
+          final by =
+              r.top + 6 + rng.nextDouble() * math.max(1, r.height - bh - 12);
           canvas.drawRect(
             Rect.fromLTWH(bx, by, bw, bh),
             Paint()..color = _building,
@@ -339,10 +365,20 @@ class _StreetPainter extends CustomPainter {
     _label(canvas, 'Road 11', const Offset(560, 322), 0);
     _label(canvas, 'Road 27', const Offset(110, 735), 0);
     _label(canvas, 'Banani', const Offset(250, 400), 0, big: true);
-    _label(canvas, 'Gulshan Lake', const Offset(940, 300), -math.pi / 2.4,
-        color: const Color(0xFF4A89A0));
-    _label(canvas, 'Banani Park', const Offset(535, 500), 0,
-        color: const Color(0xFF5C8A3A));
+    _label(
+      canvas,
+      'Gulshan Lake',
+      const Offset(940, 300),
+      -math.pi / 2.4,
+      color: const Color(0xFF4A89A0),
+    );
+    _label(
+      canvas,
+      'Banani Park',
+      const Offset(535, 500),
+      0,
+      color: const Color(0xFF5C8A3A),
+    );
   }
 
   void _label(
@@ -357,7 +393,7 @@ class _StreetPainter extends CustomPainter {
       text: TextSpan(
         text: text,
         style: TextStyle(
-          fontSize: big ? 20 : 12,
+          fontSize: big ? AppFontSize.xl : AppFontSize.sm,
           fontWeight: big ? FontWeight.w600 : FontWeight.w500,
           color: color,
           letterSpacing: big ? 1.2 : .2,

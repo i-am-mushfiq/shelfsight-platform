@@ -58,6 +58,7 @@ def load_products(session: Session, organization_id: str, as_of: date | None = N
             pack_size=product.pack_size, pack_unit=product.pack_unit, mrp=mrp.get(product.id),
             trade_price=trade.get(product.id),
             is_active=product.is_active and (product.discontinued_on is None or product.discontinued_on > as_of),
+            order_multiple=max(1, int((product.attributes or {}).get("order_multiple") or 1)),
         )
         for product, brand, manufacturer, is_own, category in rows
     }

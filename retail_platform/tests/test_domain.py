@@ -2,8 +2,10 @@ from datetime import date, timedelta
 
 import pytest
 
-from retail_platform.domain import classification, orders, placement, portfolio, recommendations, shelf
-from retail_platform.domain.records import CoreItem, Facing, OrderLine, OutletInfo, ProductInfo, Target
+from dataclasses import replace
+
+from retail_platform.domain import availability, classification, orders, placement, portfolio, recommendations, shelf
+from retail_platform.domain.records import CoreItem, Facing, OrderLine, OutletInfo, ProductInfo, ShelfStock, Target
 
 AS_OF = date(2026, 10, 1)
 
@@ -235,3 +237,98 @@ def test_rule_on_subcategory_is_not_evaluable_when_photo_only_has_parent_categor
     # ...while a rule on the parent category is evaluated from the same facings.
     parent = placement.evaluate([rule(category_id="skin", min_facings=1)], facings, "/gt/", {}, {"sq"}, descendants)
     assert parent[0].status == "compliant"
+
+
+# --- shelf-driven orders and availability ---------------------------------------------------------
+
+def stock(**overrides):
+    values = dict(visit_id="v1", covered_categories=frozenset({"soap"}), facings_by_product={},
+                  unidentified_by_category={}, verified_ratio=1.0)
+    values.update(overrides)
+    return ShelfStock(**values)
+
+
+def test_missing_core_item_is_ordered_for_a_new_outlet(world):
+    products, _, lines = world
+    shelf = stock(facings_by_product={"x": 5})  # only the competitor is on the soap shelf
+    policy = orders.ShelfPolicy(units_per_facing=4, target_facings={"a": 2})
+    (line,) = orders.suggest("new", lines, products, [], set(), AS_OF, shelf=shelf, policy=policy)
+    assert (line.product_id, line.quantity) == ("a", 8)
+    source = line.sources[0]
+    assert source["status"] == "missing" and source["uncertain"] is False
+    assert source["evidence"]["facings_seen"] == 0 and source["evidence"]["target_facings"] == 2
+    assert orders.explain(source).startswith("Missing on shelf: 0 of 2 facings")
+
+
+def test_shelf_gap_and_history_take_the_larger_not_the_sum(world):
+    products, _, lines = world  # o0 ordered 30 of "a" and 3 of "b" in one order
+    shelf = stock(facings_by_product={"a": 1})
+    policy = orders.ShelfPolicy(units_per_facing=3, target_facings={"a": 3})
+    by_product = {l.product_id: l for l in orders.suggest("o0", lines, products, [], set(), AS_OF, shelf=shelf, policy=policy)}
+    assert by_product["a"].quantity == 30  # usual order 30 > shelf need 2 facings × 3
+    assert [s["source"] for s in by_product["a"].sources] == ["replenishment", "shelf"]
+    assert by_product["a"].sources[1]["status"] == "low"
+    # Hand wash was not photographed: the shelf says nothing about it.
+    assert [s["source"] for s in by_product["b"].sources] == ["replenishment"]
+
+
+def test_usual_buy_absent_from_a_photographed_shelf_needs_one_facing(world):
+    products, _, lines = world
+    by_product = {l.product_id: l for l in orders.suggest("o0", lines, products, [], set(), AS_OF, shelf=stock(),
+                                                          policy=orders.ShelfPolicy(units_per_facing=2))}
+    shelf_source = next(s for s in by_product["a"].sources if s["source"] == "shelf")
+    assert shelf_source["evidence"]["target_facings"] == 1 and shelf_source["quantity"] == 2
+
+
+def test_unidentified_facings_make_a_gap_uncertain(world):
+    products, _, lines = world
+    shelf = stock(unidentified_by_category={"soap": 2})
+    (line,) = orders.suggest("new", lines, products, [], set(), AS_OF, shelf=shelf,
+                             policy=orders.ShelfPolicy(target_facings={"a": 2}))
+    assert line.sources[0]["uncertain"] is True
+    assert "check before sending" in orders.explain(line.sources[0])
+
+
+def test_add_sku_recommendation_does_not_double_count_a_shelf_gap(world):
+    products, _, lines = world
+    recs = [orders.RecommendationRef("r1", "add_sku", "a", 4, "accepted")]
+    (line,) = orders.suggest("new", lines, products, recs, set(), AS_OF, shelf=stock(),
+                             policy=orders.ShelfPolicy(units_per_facing=3, target_facings={"a": 2}))
+    assert line.quantity == 6
+    assert [s["source"] for s in line.sources] == ["shelf", "recommendation"]
+
+
+def test_automatic_orders_ignore_unreviewed_recommendations(world):
+    products, _, lines = world
+    recs = [orders.RecommendationRef("r1", "add_sku", "c", 6, "open"),
+            orders.RecommendationRef("r2", "increase_volume", "b", 5, "accepted")]
+    by_product = {l.product_id: l for l in orders.suggest("o0", lines, products, recs, set(), AS_OF,
+                                                          recommendation_statuses=frozenset({"accepted", "modified"}))}
+    assert "c" not in by_product
+    assert by_product["b"].quantity == 3 + 5  # increase_volume adds on top of the usual order
+
+
+def test_quantities_round_up_to_the_order_multiple(world):
+    products, _, lines = world
+    products = {**products, "a": replace(products["a"], order_multiple=12)}
+    (line,) = orders.suggest("new", lines, products, [], set(), AS_OF, shelf=stock(),
+                             policy=orders.ShelfPolicy(units_per_facing=3, target_facings={"a": 2}))
+    assert line.quantity == 12 and line.sources[-1] == {"source": "pack_multiple", "multiple": 12}
+
+
+def test_competitor_and_inactive_products_are_never_ordered_from_the_shelf(world):
+    products, _, lines = world
+    products = {**products, "a": replace(products["a"], is_active=False)}
+    suggestion = orders.suggest("new", lines, products, [], set(), AS_OF, shelf=stock(),
+                                policy=orders.ShelfPolicy(target_facings={"a": 2, "x": 3}))
+    assert suggestion == []
+
+
+def test_core_availability_never_reports_unphotographed_shelves_as_missing(world):
+    products, _, _ = world
+    core = [CoreItem("k1", None, None, "a", 2, 1), CoreItem("k2", None, None, "b", 1, 2),
+            CoreItem("k3", None, None, "c", 1, 2)]
+    shelf = stock(covered_categories=frozenset({"soap", "handwash"}), facings_by_product={"a": 1})
+    result = {a.product_id: a.status for a in availability.core_availability(core, products, shelf)}
+    assert result == {"a": "low", "b": "missing", "c": "not_checked"}
+    assert {a.status for a in availability.core_availability(core, products, None)} == {"not_checked"}

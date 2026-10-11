@@ -67,9 +67,12 @@ class Shop {
     required this.lng,
     required this.lastVisit,
     required this.channel,
+    this.channelId,
+    this.channelIcon,
     this.classLabel,
     this.openRecommendations = 0,
     this.visitedToday = false,
+    this.isVerified = true,
   });
 
   factory Shop.fromJson(Map<String, dynamic> json) {
@@ -90,9 +93,12 @@ class Shop {
       lng: (json['lng'] as num?)?.toDouble() ?? 0,
       lastVisit: _relative(lastVisitAt, now),
       channel: json['channel'] as String? ?? '',
+      channelId: json['channel_id'] as String?,
+      channelIcon: json['channel_icon'] as String?,
       classLabel: json['class_label'] as String?,
       openRecommendations: json['open_recommendations'] as int? ?? 0,
       visitedToday: today,
+      isVerified: json['is_verified'] as bool? ?? true,
     );
   }
 
@@ -103,10 +109,16 @@ class Shop {
   final double lat;
   final double lng;
   final String lastVisit;
+  /// Store type name, e.g. "Pharmacy"; [channelId] is its id for the store-type picker.
   final String channel;
+  final String? channelId;
+  final String? channelIcon;
   final String? classLabel;
   final int openRecommendations;
   final bool visitedToday;
+
+  /// False for shops registered in the field until the master data team confirms them.
+  final bool isVerified;
 
   static String _relative(DateTime? at, DateTime now) {
     if (at == null) return 'Never';

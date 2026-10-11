@@ -13,9 +13,13 @@ Invariants:
 from __future__ import annotations
 
 import logging
+import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
+
+import cv2
+import numpy as np
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -34,6 +38,7 @@ from ..models import (
     Manufacturer,
     Product,
     RecognitionCorrection,
+    ReferenceImage,
     ShelfCapture,
     ShelfMeasurement,
     Visit,
@@ -133,13 +138,18 @@ def ingest_capture(
     return IngestResult(capture, created=True, duplicate=duplicate_of is not None)
 
 
-def catalog_for(session: Session, organization_id: str, category_id: str | None) -> tuple[list[CatalogEntry], str | None]:
+def catalog_for(session: Session, organization_id: str, category_id: str | None,
+                with_references: bool = True, provider: object | None = None) -> tuple[list[CatalogEntry], str | None]:
+    """Closed catalogue for recognition. ``provider`` may declare the pack shots it wants
+    (``reference_side``, ``reference_limit``, ``references_per_product``)."""
+    # Ordered, so the catalogue a recogniser receives is byte-identical between photos (prompt caching).
     query = (
         select(Product, Brand, Manufacturer, Category)
         .join(Brand, Product.brand_id == Brand.id)
         .join(Manufacturer, Product.manufacturer_id == Manufacturer.id)
         .join(Category, Product.category_id == Category.id)
         .where(Product.organization_id == organization_id, Product.is_active.is_(True))
+        .order_by(Product.sku)
     )
     if category_id:
         category = session.get(Category, category_id)
@@ -157,7 +167,73 @@ def catalog_for(session: Session, organization_id: str, category_id: str | None)
         own_id = session.execute(
             select(Manufacturer.id).where(Manufacturer.organization_id == organization_id, Manufacturer.is_own.is_(True))
         ).scalars().first()
+    limit = getattr(provider, "reference_limit", get_settings().max_reference_images)
+    side = getattr(provider, "reference_side", THUMBNAIL_SIDE)
+    per_product = getattr(provider, "references_per_product", 1)
+    if with_references and (limit is None or limit > 0) and entries:
+        entries = _with_reference_images(session, entries, limit, side, per_product)
     return entries, own_id
+
+
+_THUMBNAILS: dict[str, bytes] = {}
+_THUMBNAIL_LOCK = threading.Lock()
+THUMBNAIL_SIDE = 320
+
+
+def _with_reference_images(session: Session, entries: list[CatalogEntry], limit: int | None, side: int,
+                           per_product: int) -> list[CatalogEntry]:
+    """Attach up to ``per_product`` pack shots per product, own products first, for up to
+    ``limit`` products (None: all)."""
+    rows = session.execute(
+        select(ReferenceImage).where(ReferenceImage.product_id.in_([e.product_id for e in entries]))
+        .order_by(ReferenceImage.created_at, ReferenceImage.id)
+    ).scalars().all()
+    shots: dict[str, list[ReferenceImage]] = {}
+    for row in rows:
+        if len(shots.setdefault(row.product_id, [])) < per_product:
+            shots[row.product_id].append(row)
+    chosen = [e.product_id for e in sorted(entries, key=lambda e: (not e.is_own, e.sku)) if e.product_id in shots]
+    if limit is not None:
+        chosen = chosen[:limit]
+    thumbnails: dict[str, tuple[bytes, ...]] = {}
+    for product_id in chosen:
+        images = tuple(t for t in (reference_thumbnail(r.blob_key, r.sha256, side) for r in shots[product_id]) if t)
+        if images:
+            thumbnails[product_id] = images
+    return [replace(e, reference_images=thumbnails[e.product_id]) if e.product_id in thumbnails else e
+            for e in entries]
+
+
+def reference_thumbnail(blob_key: str, digest: str, side: int = THUMBNAIL_SIDE) -> bytes | None:
+    """JPEG of a pack shot at most ``side`` pixels long, transparency flattened onto white."""
+    key = f"{digest}:{side}"
+    with _THUMBNAIL_LOCK:
+        cached = _THUMBNAILS.get(key)
+    if cached is not None:
+        return cached
+    try:
+        array = cv2.imdecode(np.frombuffer(blob_store().get(blob_key), dtype=np.uint8), cv2.IMREAD_UNCHANGED)
+    except OSError:
+        log.warning("reference image %s missing from blob store", blob_key)
+        return None
+    if array is None:
+        return None
+    if array.ndim == 2:
+        array = cv2.cvtColor(array, cv2.COLOR_GRAY2BGR)
+    elif array.shape[2] == 4:
+        alpha = array[:, :, 3:].astype(np.float32) / 255.0
+        array = (array[:, :, :3].astype(np.float32) * alpha + 255 * (1 - alpha)).astype(np.uint8)
+    scale = side / max(array.shape[:2])
+    if scale < 1:
+        array = cv2.resize(array, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+    ok, encoded = cv2.imencode(".jpg", array, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+    if not ok:
+        return None
+    with _THUMBNAIL_LOCK:
+        if len(_THUMBNAILS) > 1024:
+            _THUMBNAILS.clear()
+        _THUMBNAILS[key] = encoded.tobytes()
+    return encoded.tobytes()
 
 
 def run_inference(session: Session, capture: ShelfCapture) -> Inference:
@@ -169,7 +245,7 @@ def run_inference(session: Session, capture: ShelfCapture) -> Inference:
                           input_sha256=capture.sha256, status="running")
     session.add(inference)
     capture.status = "analysing"
-    catalog, own_manufacturer = catalog_for(session, capture.organization_id, capture.category_id)
+    catalog, own_manufacturer = catalog_for(session, capture.organization_id, capture.category_id, provider=provider)
     # Commit before the (possibly slow, remote) provider call so no write lock is held during it,
     # and so a failed run stays recorded even when the caller rolls back.
     session.commit()

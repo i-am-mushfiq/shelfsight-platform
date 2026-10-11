@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
+
 import '../theme/app_theme.dart';
 import '../widgets/app_widgets.dart';
 import '../widgets/shell_widgets.dart';
@@ -95,16 +97,16 @@ class _LearnScreenState extends State<LearnScreen> {
   @override
   Widget build(BuildContext context) {
     return FixedHeaderScrollView(
-      title: 'Learn',
-      subtitle: 'Preview · audio not connected yet',
+      title: t('Learn'),
+      subtitle: t('Preview · audio not connected yet'),
       slivers: [
         pagePadding([
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(bottom: 12),
             child: StatusPill(
-              label: 'Preview only: lesson playback is simulated. Real call coaching is a later milestone.',
+              label: t('Preview only: lesson playback is simulated. Real call coaching is a later milestone.'),
               icon: Icons.info_outline_rounded,
-              color: Color(0xFF92580A),
+              color: AppColors.amberInk,
               background: AppColors.amberSoft,
             ),
           ),
@@ -128,8 +130,8 @@ class _LearnScreenState extends State<LearnScreen> {
                   _lesson.title,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 21,
-                    fontWeight: FontWeight.w800,
+                    fontSize: AppFontSize.xl,
+                    fontWeight: FontWeight.w600,
                     letterSpacing: -.4,
                   ),
                 ),
@@ -176,7 +178,7 @@ class _LearnScreenState extends State<LearnScreen> {
             ),
           ),
           const SizedBox(height: 22),
-          const SectionTitle(title: 'Coaching library'),
+          SectionTitle(title: t('Coaching library')),
           const SizedBox(height: 8),
           for (var i = 0; i < _lessons.length; i++)
             Padding(
@@ -212,8 +214,8 @@ class _LearnScreenState extends State<LearnScreen> {
                           Text(
                             _lessons[i].title,
                             style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              fontSize: AppFontSize.lg,
                               color: AppColors.ink,
                             ),
                           ),
@@ -221,7 +223,7 @@ class _LearnScreenState extends State<LearnScreen> {
                             '${_lessons[i].topic} · ${_fmt(_lessons[i].seconds)}',
                             style: const TextStyle(
                               color: AppColors.inkMuted,
-                              fontSize: 13,
+                              fontSize: AppFontSize.md,
                             ),
                           ),
                         ],

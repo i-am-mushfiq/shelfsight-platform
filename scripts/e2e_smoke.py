@@ -35,16 +35,26 @@ def main() -> None:
     intel = step("intelligence", client.post(f"/v2/outlets/{outlet['id']}/intelligence:refresh"))
     print(f"     class={intel['classification']['label']} recs={len(intel['recommendations'])} origin={intel['data_origin']}")
 
+    store_types = step("store types", client.get("/v2/catalog/store-types"))
+    print(f"     {len(store_types)} store types: {', '.join(t['name'] for t in store_types)}")
+    by_code = {t["code"]: t for t in store_types}
+    new_shop = step("register shop", client.post("/v2/outlets", json={
+        "client_outlet_id": uuid.uuid4().hex, "name": "Smoke Test Cosmetics", "store_type_id": by_code["GT-GROC"]["id"],
+        "lat": outlet["lat"] + 0.002, "lng": outlet["lng"]}))
+    print(f"     {new_shop['code']} verified={new_shop['is_verified']} duplicates={len(new_shop['possible_duplicates'])}")
+
     category = next(c for c in step("categories", client.get("/v2/catalog/categories")) if c["code"] == "SKIN")
-    visit = step("start visit", client.post("/v2/visits", json={
-        "client_visit_id": uuid.uuid4().hex, "outlet_id": outlet["id"], "lat": outlet["lat"], "lng": outlet["lng"]}))
+    visit = step("start visit as Super Shop", client.post("/v2/visits", json={
+        "client_visit_id": uuid.uuid4().hex, "outlet_id": outlet["id"], "lat": outlet["lat"], "lng": outlet["lng"],
+        "store_type_id": by_code["MT-SS"]["id"]}))
+    print(f"     store type={visit['store_type']['name']} changed_from={visit['previous_store_type']}")
     capture = step("upload photo", client.post(
         f"/v2/visits/{visit['id']}/captures",
         files={"image": (IMAGE.name, IMAGE.read_bytes(), "image/png")},
         data={"client_capture_id": uuid.uuid4().hex, "area": category["name"], "category_id": category["id"]}))
     print(f"     quality acceptable={capture['quality_acceptable']} warnings={capture['quality']['warnings']}")
 
-    for _ in range(60):
+    for _ in range(120):
         capture = client.get(f"/v2/captures/{capture['id']}").json()
         if capture["status"] in {"analysed", "failed"}:
             break
@@ -52,8 +62,8 @@ def main() -> None:
     if capture["status"] != "analysed":
         sys.exit(f"FAIL analysis: {capture['status']} {capture.get('inference')}")
     inference = capture["inference"]
-    print(f"ok   analysed by {inference['model']['version']} in {inference['latency_ms']} ms: "
-          f"{inference['detections_total']} facings, {inference['needs_review']} need review")
+    print(f"ok   analysed by {inference['model']['provider']} {inference['model']['version']} in "
+          f"{inference['latency_ms']} ms: {inference['detections_total']} facings, {inference['needs_review']} need review")
     image = client.get(capture["image_url"])
     if image.status_code != 200 or not image.content:
         sys.exit(f"FAIL capture image: {image.status_code}")
@@ -71,11 +81,24 @@ def main() -> None:
     print(f"     verified share of shelf={shelf['share_of_shelf']} ({shelf['own_facings']}/{shelf['total_facings']})")
     for rule in result["intelligence"]["placement"]["results"]:
         print(f"     placement: {rule['status']:<14} {rule['description']}")
+    order = result["order"]
+    if order is None:
+        sys.exit("FAIL no automatic order")
+    print(f"ok   automatic order {order['status']}: {len(order['lines'])} lines, BDT {order['value']}")
+    for line in order["lines"][:5]:
+        print(f"       {line['name']} x{line['quantity']} - {'; '.join(line['reasons'])}")
+    report = step("visit report", client.get(f"/v2/visits/{visit['id']}/report"))
+    for text_line in report["summary_text"].splitlines():
+        print(f"     | {text_line}")
+    first = order["lines"][0]
+    edited = step("edit order", client.put(f"/v2/orders/{order['id']}", json={
+        "lines": [{"product_id": first["product_id"], "quantity": first["quantity"] + 1}]}))
+    print(f"     edited: {edited['lines'][0]['quantity']} (suggested {edited['lines'][0]['suggested_quantity']})")
 
     suggestion = step("suggested order", client.get(f"/v2/outlets/{outlet['id']}/suggested-order"))
     line = suggestion["lines"][0]
     step("place order", client.post(f"/v2/outlets/{outlet['id']}/orders", json={
-        "client_order_id": uuid.uuid4().hex, "visit_id": visit["id"],
+        "client_order_id": uuid.uuid4().hex,
         "lines": [{"product_id": line["product_id"], "quantity": line["quantity"], "suggested_quantity": line["quantity"]}]}))
     brief = step("call brief", client.get(f"/v2/outlets/{outlet['id']}/call-brief"))
     print(f"     {len(brief['talking_points'])} talking points")

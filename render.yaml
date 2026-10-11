@@ -17,7 +17,7 @@ services:
     runtime: python
     plan: free
     region: singapore
-    buildCommand: pip install --upgrade pip uv && uv sync --frozen --no-dev --extra postgres
+    buildCommand: pip install --upgrade pip uv && uv sync --frozen --no-dev --extra postgres --extra llm
     startCommand: uv run --no-sync uvicorn retail_platform.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     autoDeployTrigger: 'off'
@@ -34,5 +34,11 @@ services:
         value: /tmp/shelfsight-blobs
       - key: SHELFSIGHT_OUTPUT_DIR
         value: /tmp/shelfsight-output
+      # auto = pack-shot lookup (no AI service). Set claude-shelf (and ANTHROPIC_API_KEY) to use Claude instead.
       - key: SHELFSIGHT_VISION_PROVIDER
-        value: opencv-baseline
+        value: auto
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # confirm = submitting a visit places the shelf-driven order; draft = officer confirms; off = none.
+      - key: SHELFSIGHT_AUTO_ORDER
+        value: confirm

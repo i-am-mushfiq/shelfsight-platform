@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
+
+import '../models/field_models.dart';
 import '../services/platform_api.dart';
 import '../services/upload_queue.dart';
 import '../theme/app_theme.dart';
@@ -17,15 +20,15 @@ class AuditUploadScreen extends StatefulWidget {
     super.key,
     required this.storeName,
     required this.visitId,
-    required this.categoryId,
-    required this.categoryName,
-    required this.imagePaths,
+    required this.photos,
+    this.sphereCaptureIds = const [],
   });
   final String storeName;
   final String visitId;
-  final String categoryId;
-  final String categoryName;
-  final List<String> imagePaths;
+  final List<CapturedPhoto> photos;
+
+  /// Photo spheres are uploaded when taken; here they are only followed through analysis.
+  final List<String> sphereCaptureIds;
 
   @override
   State<AuditUploadScreen> createState() => _AuditUploadScreenState();
@@ -57,12 +60,12 @@ class _AuditUploadScreenState extends State<AuditUploadScreen> {
   }
 
   Future<void> _enqueue() async {
-    for (final path in widget.imagePaths) {
+    for (final photo in widget.photos) {
       await _queue.enqueue(
         visitId: widget.visitId,
-        sourcePath: path,
-        area: widget.categoryName,
-        categoryId: widget.categoryId,
+        sourcePath: photo.path,
+        area: photo.categoryName,
+        categoryId: photo.categoryId,
       );
     }
     if (mounted) setState(() => _enqueued = true);
@@ -78,8 +81,22 @@ class _AuditUploadScreenState extends State<AuditUploadScreen> {
     return status == 'analysed' || status == 'failed';
   }
 
+  bool _sphereFinished(String id) {
+    final status = _captures[id]?['status'];
+    return status == 'analysed' || status == 'failed';
+  }
+
   Future<void> _refresh() async {
     _queue.drain();
+    for (final id in widget.sphereCaptureIds) {
+      if (_sphereFinished(id)) continue;
+      try {
+        final capture = await PlatformApi.instance.capture(id);
+        if (mounted) setState(() => _captures[id] = capture);
+      } on ApiException {
+        // Next tick.
+      }
+    }
     for (final item in _items) {
       if (item.state != UploadState.uploaded || item.captureId == null || _finished(item)) continue;
       try {
@@ -91,10 +108,16 @@ class _AuditUploadScreenState extends State<AuditUploadScreen> {
     }
   }
 
-  bool get _allFinished => _enqueued && _items.isNotEmpty && _items.every(_finished);
+  bool get _allFinished =>
+      _enqueued &&
+      (_items.isNotEmpty || widget.sphereCaptureIds.isNotEmpty) &&
+      _items.every(_finished) &&
+      widget.sphereCaptureIds.every(_sphereFinished);
   List<String> get _analysedIds => [
     for (final item in _items)
       if (item.captureId != null && _captures[item.captureId]?['status'] == 'analysed') item.captureId!,
+    for (final id in widget.sphereCaptureIds)
+      if (_captures[id]?['status'] == 'analysed') id,
   ];
   int get _waitingOffline => _items.where((i) => i.state == UploadState.queued && i.attempts > 0).length;
 
@@ -107,10 +130,10 @@ class _AuditUploadScreenState extends State<AuditUploadScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Upload and analysis'),
+            Text(t('Sending photos')),
             Text(
-              '${widget.storeName} · ${widget.categoryName}',
-              style: const TextStyle(fontSize: 12, color: AppColors.inkMuted, fontWeight: FontWeight.w500),
+              '${widget.storeName} · ${widget.photos.length} photo(s)',
+              style: const TextStyle(fontSize: AppFontSize.sm, color: AppColors.inkMuted, fontWeight: FontWeight.w500),
             ),
           ],
         ),
@@ -124,9 +147,8 @@ class _AuditUploadScreenState extends State<AuditUploadScreen> {
           ),
           child: PrimaryButton(
             label: _allFinished
-                ? (_analysedIds.isEmpty ? 'No photo could be analysed' : 'Review detections')
-                : 'Waiting for ${items.where((i) => !_finished(i)).length} photo(s)…',
-            icon: Icons.fact_check_outlined,
+                ? (_analysedIds.isEmpty ? 'No photo could be read' : 'Check the results')
+                : 'Waiting for ${items.where((i) => !_finished(i)).length + widget.sphereCaptureIds.where((id) => !_sphereFinished(id)).length} photo(s)…',
             onPressed: _allFinished && _analysedIds.isNotEmpty
                 ? () => Navigator.of(context).pushReplacement(
                     MaterialPageRoute(
@@ -142,7 +164,7 @@ class _AuditUploadScreenState extends State<AuditUploadScreen> {
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpace.page),
         children: [
           if (_waitingOffline > 0)
             Padding(
@@ -152,13 +174,37 @@ class _AuditUploadScreenState extends State<AuditUploadScreen> {
                 borderColor: AppColors.amber,
                 child: Row(
                   children: [
-                    const Icon(Icons.cloud_off_rounded, color: Color(0xFF92580A)),
+                    const Icon(Icons.cloud_off_rounded, color: AppColors.amberInk),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         '$_waitingOffline photo(s) saved on this phone. They upload automatically when the '
                         'connection returns. You can continue the visit and come back from Visits.',
-                        style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF92580A)),
+                        style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.amberInk),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          for (final id in widget.sphereCaptureIds)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: SurfaceCard(
+                child: Row(
+                  children: [
+                    _sphereFinished(id)
+                        ? const Icon(Icons.threesixty_rounded, color: AppColors.emeraldDark)
+                        : const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _captures[id]?['status'] == 'analysed'
+                            ? '360° sphere · ${(_captures[id]?['inference'] as Map?)?['detections_total'] ?? 0} packs found'
+                            : _captures[id]?['status'] == 'failed'
+                            ? '360° sphere · analysis failed'
+                            : '360° sphere · analysing…',
+                        style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink),
                       ),
                     ),
                   ],
@@ -213,25 +259,22 @@ class _CaptureRow extends StatelessWidget {
           title = 'Duplicate of another photo · skipped';
           icon = Icons.content_copy_rounded;
         } else if (status == 'analysed') {
-          title = '${inference?['detections_total'] ?? 0} facings found · '
-              '${inference?['needs_review'] ?? 0} need review';
+          title = '${inference?['detections_total'] ?? 0} packs found · '
+              '${inference?['needs_review'] ?? 0} to check';
           icon = Icons.check_circle_rounded;
           color = AppColors.emeraldDark;
         } else if (status == 'failed') {
-          title = 'Analysis failed';
+          title = 'Could not read this photo';
           icon = Icons.error_outline_rounded;
           color = AppColors.red;
         } else {
-          title = 'Uploaded · analysing…';
+          title = 'Sent · reading the shelf…';
           icon = Icons.auto_awesome_outlined;
           busy = true;
         }
     }
-    final warnings = [
-      ...item.qualityWarnings,
-      ...((inference?['warnings'] as List?) ?? const []).cast<String>(),
-    ];
-    final model = inference?['model'] as Map?;
+    // Only problems with this photo; how recognition works is explained once, in the report.
+    final warnings = item.qualityWarnings;
     return SurfaceCard(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -244,28 +287,21 @@ class _CaptureRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Photo $index', style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink)),
-                Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w600)),
+                Text('Photo $index', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink)),
+                const SizedBox(height: 2),
+                Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w500)),
                 if (item.error != null && item.state != UploadState.uploaded)
-                  Text(item.error!, style: const TextStyle(fontSize: 12.5, color: AppColors.inkMuted)),
+                  Text(item.error!, style: const TextStyle(fontSize: AppFontSize.sm, color: AppColors.inkMuted)),
                 for (final warning in warnings.take(3))
                   Padding(
                     padding: const EdgeInsets.only(top: 3),
-                    child: Text('⚠ $warning', style: const TextStyle(fontSize: 12.5, color: Color(0xFF92580A))),
-                  ),
-                if (model != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 3),
-                    child: Text(
-                      'Model: ${model['provider']}',
-                      style: const TextStyle(fontSize: 11.5, color: AppColors.inkMuted),
-                    ),
+                    child: Text('⚠ $warning', style: const TextStyle(fontSize: AppFontSize.sm, color: AppColors.amberInk)),
                   ),
               ],
             ),
           ),
           if (onRemove != null)
-            IconButton(tooltip: 'Remove', onPressed: onRemove, icon: const Icon(Icons.close_rounded)),
+            IconButton(tooltip: t('Remove'), onPressed: onRemove, icon: const Icon(Icons.close_rounded)),
         ],
       ),
     );

@@ -184,6 +184,19 @@ def persist(session: Session, organization_id: str, intel: OutletIntelligence, d
                                 intel.rule_sets, visit_id)
 
 
+def recommendation_out(rec: Recommendation, products: dict) -> dict:  # type: ignore[type-arg]
+    product = products.get(rec.product_id) if rec.product_id else None
+    return {
+        "id": rec.id, "type": rec.type, "status": rec.status, "action": rec.action, "reason": rec.reason,
+        "evidence": rec.evidence, "expected_impact": rec.expected_impact,
+        "suggested_quantity": rec.suggested_quantity, "confidence": rec.confidence, "priority": rec.priority,
+        "source": rec.source, "generator_version": rec.generator_version,
+        "product": {"id": product.id, "sku": product.sku, "name": product.name} if product else None,
+        "created_at": rec.created_at.isoformat(), "data_origin": rec.data_origin,
+        "disclaimer": "Recommendation, not fact: based on the evidence shown.",
+    }
+
+
 REJECTION_COOLDOWN_DAYS = 30
 
 

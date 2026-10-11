@@ -1,35 +1,36 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from datetime import date, timedelta
+from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from .. import audit
-from ..domain import call_prep, orders as order_domain
+from ..domain import call_prep
 from ..models import (
     Channel,
     CompetitorObservation,
+    Distributor,
     Manufacturer,
     Order,
-    OrderItem,
     Outlet,
+    OutletAssignment,
     OutletClass,
     Product,
-    Promotion,
-    PromotionProduct,
     Recommendation,
     RecommendationFeedback,
+    Role,
     Territory,
     Visit,
 )
 from ..observability import RECOMMENDATION_FEEDBACK
-from ..security import Principal, scoped_outlets
-from ..services import intelligence, loaders
+from ..security import Principal, distance_m, scoped_outlets
+from ..services import intelligence, loaders, ordering
+from ..services.intelligence import recommendation_out
 from .deps import DB, outlet_or_404, require
 
 router = APIRouter(prefix="/v2", tags=["outlets"])
@@ -47,11 +48,15 @@ class OutletSummary(BaseModel):
     lng: float | None
     channel: str
     channel_code: str
+    channel_id: str
+    channel_icon: str | None
     territory: str
     class_code: str | None
     class_label: str | None
     last_visit_at: str | None
     open_recommendations: int
+    # False for outlets registered in the field until the master data team confirms them.
+    is_verified: bool
     data_origin: str
 
 
@@ -75,10 +80,12 @@ def _summaries(session, principal: Principal, outlets: list[Outlet]) -> list[Out
         result.append(OutletSummary(
             id=outlet.id, code=outlet.code, name=outlet.name, name_bn=outlet.name_bn, address=outlet.address,
             lat=outlet.lat, lng=outlet.lng, channel=channel.name, channel_code=channel.code,
+            channel_id=channel.id, channel_icon=channel.icon,
             territory=territories.get(outlet.territory_id, ""), class_code=cls.code if cls else None,
             class_label=cls.label if cls else None,
             last_visit_at=last_visit[outlet.id].isoformat() if outlet.id in last_visit else None,
-            open_recommendations=open_recs.get(outlet.id, 0), data_origin=outlet.data_origin,
+            open_recommendations=open_recs.get(outlet.id, 0), is_verified=outlet.is_verified,
+            data_origin=outlet.data_origin,
         ))
     return result
 
@@ -105,20 +112,95 @@ def get_outlet(outlet_id: str, principal: Reader, session: DB) -> OutletSummary:
     return _summaries(session, principal, [outlet_or_404(session, principal, outlet_id)])[0]
 
 
+def store_type_or_422(session, principal: Principal, store_type_id: str) -> Channel:  # type: ignore[no-untyped-def]
+    channel = session.get(Channel, store_type_id)
+    if channel is None or channel.organization_id != principal.organization_id \
+            or not channel.is_store_type or not channel.is_active:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown store type")
+    return channel
+
+
+class OutletIn(BaseModel):
+    client_outlet_id: str = Field(min_length=8, max_length=64)
+    name: str = Field(min_length=2, max_length=200)
+    name_bn: str | None = Field(default=None, max_length=200)
+    owner_name: str | None = Field(default=None, max_length=200)
+    phone: str | None = Field(default=None, max_length=32)
+    address: str | None = Field(default=None, max_length=500)
+    lat: float | None = Field(default=None, ge=-90, le=90)
+    lng: float | None = Field(default=None, ge=-180, le=180)
+    store_type_id: str
+    # Defaults to the officer's own territory; supervisors name one inside their area.
+    territory_id: str | None = None
+
+
+DUPLICATE_RADIUS_METERS = 50
+
+
+@router.post("/outlets", status_code=201)
+def register_outlet(body: OutletIn, session: DB, response: Response,
+                    principal: Annotated[Principal, Depends(require("outlet:register"))]) -> dict:
+    """Register a shop found in the field. It starts unverified and assigned to the officer."""
+    code = f"F-{body.client_outlet_id[:10].upper()}"
+    existing = session.execute(select(Outlet).where(Outlet.organization_id == principal.organization_id,
+                                                    Outlet.code == code)).scalar_one_or_none()
+    if existing is not None:
+        if (existing.attributes or {}).get("registered_by") != principal.user_id:
+            raise HTTPException(status.HTTP_409_CONFLICT, "client_outlet_id already used")
+        response.status_code = status.HTTP_200_OK
+        return {**_summaries(session, principal, [existing])[0].model_dump(), "possible_duplicates": [], "replayed": True}
+    store_type = store_type_or_422(session, principal, body.store_type_id)
+    territory = session.get(Territory, body.territory_id or principal.territory_id or "")
+    home = session.get(Territory, principal.territory_id or "")
+    if territory is None or territory.organization_id != principal.organization_id or home is None \
+            or not territory.path.startswith(home.path):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "territory_id must be inside your own territory")
+    if territory.kind != "territory":
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Choose a sales territory, not a region or area")
+    # The distributor serving the territory, or the nearest ancestor territory that has one.
+    ancestors = sorted((t for t in session.execute(select(Territory).where(
+        Territory.organization_id == principal.organization_id)).scalars() if territory.path.startswith(t.path)),
+        key=lambda t: -len(t.path))
+    distributor_id = None
+    for candidate in ancestors:
+        distributor_id = session.execute(select(Distributor.id).where(
+            Distributor.territory_id == candidate.id).order_by(Distributor.code)).scalars().first()
+        if distributor_id:
+            break
+    duplicates = []
+    if body.lat is not None and body.lng is not None:
+        for other in session.execute(scoped_outlets(session, principal).where(
+                Outlet.is_active.is_(True), Outlet.lat.is_not(None), Outlet.lng.is_not(None))).scalars():
+            meters = distance_m(body.lat, body.lng, other.lat, other.lng)
+            if meters <= DUPLICATE_RADIUS_METERS:
+                duplicates.append({"id": other.id, "code": other.code, "name": other.name, "meters": round(meters, 1)})
+    outlet = Outlet(
+        organization_id=principal.organization_id, data_origin=principal.data_origin, code=code, name=body.name.strip(),
+        name_bn=body.name_bn, owner_name=body.owner_name, phone=body.phone, address=body.address,
+        lat=body.lat, lng=body.lng, territory_id=territory.id, distributor_id=distributor_id,
+        channel_id=store_type.id, is_verified=False,
+        attributes={"client_outlet_id": body.client_outlet_id, "registered_by": principal.user_id,
+                    "registered_at": date.today().isoformat(), "store_type_source": "field"},
+    )
+    session.add(outlet)
+    session.flush()
+    if principal.role == Role.SALES_OFFICER:
+        session.add(OutletAssignment(organization_id=principal.organization_id, data_origin=principal.data_origin,
+                                     outlet_id=outlet.id, user_id=principal.user_id, effective_from=date.today()))
+    audit.record(session, principal, "outlet.register", "outlet", outlet.id,
+                 {"code": code, "store_type": store_type.code, "territory": territory.code,
+                  "possible_duplicates": [d["id"] for d in duplicates]})
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "Outlet was registered concurrently; refresh the list") from exc
+    duplicates.sort(key=lambda d: d["meters"])
+    return {**_summaries(session, principal, [outlet])[0].model_dump(), "possible_duplicates": duplicates[:5],
+            "replayed": False}
+
+
 # --- intelligence --------------------------------------------------------------------------------
-
-
-def recommendation_out(rec: Recommendation, products: dict) -> dict:  # type: ignore[type-arg]
-    product = products.get(rec.product_id) if rec.product_id else None
-    return {
-        "id": rec.id, "type": rec.type, "status": rec.status, "action": rec.action, "reason": rec.reason,
-        "evidence": rec.evidence, "expected_impact": rec.expected_impact,
-        "suggested_quantity": rec.suggested_quantity, "confidence": rec.confidence, "priority": rec.priority,
-        "source": rec.source, "generator_version": rec.generator_version,
-        "product": {"id": product.id, "sku": product.sku, "name": product.name} if product else None,
-        "created_at": rec.created_at.isoformat(), "data_origin": rec.data_origin,
-        "disclaimer": "Recommendation, not fact: based on the evidence shown.",
-    }
 
 
 @router.post("/outlets/{outlet_id}/intelligence:refresh")
@@ -147,7 +229,7 @@ def serialize_intelligence(intel: intelligence.OutletIntelligence, recs: list[Re
     return {
         "data_origin": data_origin,
         "outlet": {"id": intel.outlet.id, "code": intel.outlet.code, "name": intel.outlet.name,
-                   "class": intel.outlet.class_label},
+                   "class": intel.outlet.class_label, "channel_id": intel.outlet.channel_id},
         "as_of": intel.as_of.isoformat(),
         "classification": intel.classification,
         "scores": [asdict(s) for s in intel.scores],
@@ -213,95 +295,6 @@ def recommendation_feedback(recommendation_id: str, body: FeedbackIn, session: D
     return {"id": rec.id, "status": rec.status}
 
 
-# --- orders ----------------------------------------------------------------------------------
-
-
-def _active_promotions(session, organization_id: str, channel_path: str, today: date) -> list[tuple[Promotion, list[str]]]:  # type: ignore[no-untyped-def]
-    channel_paths = dict(session.execute(select(Channel.id, Channel.path).where(Channel.organization_id == organization_id)).all())
-    promos = session.execute(select(Promotion).where(Promotion.organization_id == organization_id,
-                                                     Promotion.starts_on <= today, Promotion.ends_on >= today)).scalars()
-    result = []
-    for promo in promos:
-        if promo.channel_id and not channel_path.startswith(channel_paths.get(promo.channel_id, "\x00")):
-            continue
-        product_ids = list(session.execute(select(PromotionProduct.product_id).where(PromotionProduct.promotion_id == promo.id)).scalars())
-        result.append((promo, product_ids))
-    return result
-
-
-@router.get("/outlets/{outlet_id}/suggested-order")
-def suggested_order(outlet_id: str, principal: Reader, session: DB) -> dict:
-    outlet = outlet_or_404(session, principal, outlet_id)
-    today = date.today()
-    products = loaders.load_products(session, principal.organization_id, today)
-    lines = loaders.load_order_lines(session, principal.organization_id, today - timedelta(days=120))
-    recs = session.execute(select(Recommendation).where(Recommendation.outlet_id == outlet_id,
-                                                        Recommendation.status.in_(("open", "accepted", "modified")))).scalars()
-    refs = [order_domain.RecommendationRef(r.id, r.type, r.product_id, r.suggested_quantity, r.status) for r in recs]
-    channel = session.get(Channel, outlet.channel_id)
-    promoted = {pid for _, pids in _active_promotions(session, principal.organization_id, channel.path, today) for pid in pids}
-    suggestion = order_domain.suggest(outlet_id, lines, products, refs, promoted, today)
-    return {"data_origin": principal.data_origin, "generator_version": order_domain.GENERATOR_VERSION,
-            "lines": [asdict(s) for s in suggestion],
-            "total_value": round(sum(s.quantity * s.unit_price for s in suggestion), 2),
-            "note": "Suggestion only. The officer decides the final order; differences are tracked."}
-
-
-class OrderLineIn(BaseModel):
-    product_id: str
-    quantity: int = Field(ge=1, le=100000)
-    suggested_quantity: int | None = Field(default=None, ge=0)
-    recommendation_id: str | None = None
-
-
-class OrderIn(BaseModel):
-    client_order_id: str = Field(min_length=8, max_length=64)
-    visit_id: str | None = None
-    lines: list[OrderLineIn] = Field(min_length=1)
-
-
-@router.post("/outlets/{outlet_id}/orders", status_code=201)
-def create_order(outlet_id: str, body: OrderIn, session: DB,
-                 principal: Annotated[Principal, Depends(require("order:write"))]) -> dict:
-    outlet = outlet_or_404(session, principal, outlet_id)
-    ref = f"APP-{body.client_order_id}"
-    existing = session.execute(select(Order).where(Order.organization_id == principal.organization_id,
-                                                   Order.external_ref == ref)).scalar_one_or_none()
-    if existing is not None:
-        return {"id": existing.id, "status": existing.status, "replayed": True}
-    products = loaders.load_products(session, principal.organization_id)
-    order = Order(organization_id=principal.organization_id, data_origin=principal.data_origin, outlet_id=outlet.id,
-                  user_id=principal.user_id, distributor_id=outlet.distributor_id, visit_id=body.visit_id,
-                  order_date=date.today(), source="app", external_ref=ref, status="confirmed")
-    for line in body.lines:
-        product = products.get(line.product_id)
-        if product is None or not product.is_own or not product.is_active:
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Product {line.product_id} cannot be ordered")
-        if line.recommendation_id:
-            rec = session.get(Recommendation, line.recommendation_id)
-            if rec is None or rec.outlet_id != outlet.id:
-                raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Recommendation does not belong to this outlet")
-        if product.trade_price is None:
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"No trade price configured for {product.sku}")
-        price = product.trade_price
-        order.items.append(OrderItem(organization_id=principal.organization_id, data_origin=principal.data_origin,
-                                     product_id=product.id, quantity=line.quantity, unit_price=round(price, 2),
-                                     line_value=round(price * line.quantity, 2),
-                                     suggested_quantity=line.suggested_quantity, recommendation_id=line.recommendation_id))
-    session.add(order)
-    audit.record(session, principal, "order.create", "sales_order", None,
-                 {"outlet_id": outlet.id, "lines": len(body.lines), "external_ref": ref})
-    try:
-        session.commit()
-    except IntegrityError:
-        session.rollback()
-        existing = session.execute(select(Order).where(Order.organization_id == principal.organization_id,
-                                                       Order.external_ref == ref)).scalar_one()
-        return {"id": existing.id, "status": existing.status, "replayed": True}
-    return {"id": order.id, "status": order.status, "replayed": False,
-            "value": round(sum(float(i.line_value) for i in order.items), 2)}
-
-
 # --- call preparation ------------------------------------------------------------------------
 
 
@@ -311,14 +304,15 @@ def call_brief(outlet_id: str, principal: Reader, session: DB) -> dict:
     today = date.today()
     products = loaders.load_products(session, principal.organization_id, today)
     channel = session.get(Channel, outlet.channel_id)
-    recent = session.execute(select(Order).where(Order.outlet_id == outlet_id).order_by(Order.order_date.desc()).limit(3)).scalars().all()
+    recent = session.execute(select(Order).where(Order.outlet_id == outlet_id, Order.status == "confirmed")
+                             .order_by(Order.order_date.desc()).limit(3)).scalars().all()
     last_orders = [{"id": o.id, "order_date": o.order_date.isoformat(), "lines": len(o.items),
                     "value": round(sum(float(i.line_value) for i in o.items), 2),
                     "products": [products[i.product_id].name for i in o.items if i.product_id in products][:6]} for o in recent]
     recs = session.execute(select(Recommendation).where(Recommendation.outlet_id == outlet_id, Recommendation.status == "open")).scalars().all()
     promos = [{"id": p.id, "name": p.name, "mechanic": p.mechanic, "ends_on": p.ends_on.isoformat(),
                "products": [products[pid].name for pid in pids if pid in products]}
-              for p, pids in _active_promotions(session, principal.organization_id, channel.path, today)]
+              for p, pids in ordering.active_promotions(session, principal.organization_id, channel.path, today)]
     manufacturers = dict(session.execute(select(Manufacturer.id, Manufacturer.name).where(Manufacturer.organization_id == principal.organization_id)).all())
     notes = [{"id": o.id, "source": o.source,
               "text": f"{manufacturers.get(o.manufacturer_id, 'Competitor')} {products[o.product_id].name if o.product_id in products else ''}"

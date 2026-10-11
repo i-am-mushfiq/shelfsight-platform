@@ -8,7 +8,7 @@ import io
 from datetime import date
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
@@ -27,10 +27,13 @@ from ..models import (
     PortfolioTarget,
     Product,
     ProductPrice,
+    ReferenceImage,
     RuleSet,
 )
 from ..security import Principal
-from ..services import intelligence
+from ..services import intelligence, reference_images
+from .catalog import channel_out
+from .live import forget_catalogs
 from .deps import DB, require
 
 router = APIRouter(prefix="/v2/admin", tags=["admin"])
@@ -279,3 +282,104 @@ def run_classification(session: DB, principal: Annotated[Principal, Depends(requ
     audit.record(session, principal, "classification.run", "outlet_classification", None, {"written": written})
     session.commit()
     return {"assessments_written": written}
+
+
+# --- store types / channel taxonomy -----------------------------------------------------------
+
+ICON_PATTERN = "^[a-z][a-z0-9_-]{0,31}$"
+
+
+class ChannelIn(BaseModel):
+    code: str = Field(pattern="^[A-Z0-9][A-Z0-9_-]{0,31}$")
+    name: str = Field(min_length=2, max_length=200)
+    name_bn: str | None = Field(default=None, max_length=200)
+    parent_id: str | None = None
+    description: str | None = Field(default=None, max_length=500)
+    is_store_type: bool = False
+    sort_order: int = Field(default=0, ge=0, le=1000)
+    icon: str | None = Field(default=None, pattern=ICON_PATTERN)
+    units_per_facing: int | None = Field(default=None, ge=1, le=500)
+
+
+@router.post("/channels", status_code=201)
+def create_channel(body: ChannelIn, principal: RulesWriter, session: DB) -> dict:
+    if session.execute(select(Channel.id).where(Channel.organization_id == principal.organization_id,
+                                                Channel.code == body.code)).first():
+        raise HTTPException(409, "Channel code already exists")
+    parent = None
+    if body.parent_id:
+        parent = session.get(Channel, body.parent_id)
+        if parent is None or parent.organization_id != principal.organization_id:
+            raise HTTPException(422, "Unknown parent_id")
+    channel = Channel(organization_id=principal.organization_id, data_origin=principal.data_origin,
+                      path=(parent.path if parent else "/") + body.code.lower() + "/", **body.model_dump())
+    session.add(channel)
+    session.flush()
+    audit.record(session, principal, "channel.create", "channel", channel.id, body.model_dump())
+    session.commit()
+    return channel_out(channel)
+
+
+class ChannelPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=200)
+    name_bn: str | None = Field(default=None, max_length=200)
+    description: str | None = Field(default=None, max_length=500)
+    is_store_type: bool | None = None
+    is_active: bool | None = None
+    sort_order: int | None = Field(default=None, ge=0, le=1000)
+    icon: str | None = Field(default=None, pattern=ICON_PATTERN)
+    units_per_facing: int | None = Field(default=None, ge=1, le=500)
+
+
+@router.patch("/channels/{channel_id}")
+def update_channel(channel_id: str, body: ChannelPatch, principal: RulesWriter, session: DB) -> dict:
+    channel = session.get(Channel, channel_id)
+    if channel is None or channel.organization_id != principal.organization_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Channel not found")
+    changes = body.model_dump(exclude_unset=True)
+    before = {key: getattr(channel, key) for key in changes}
+    for key, value in changes.items():
+        setattr(channel, key, value)
+    audit.record(session, principal, "channel.update", "channel", channel.id, {"before": before, "after": changes})
+    session.commit()
+    return channel_out(channel)
+
+
+# --- catalogue pack shots ----------------------------------------------------------------------
+
+CatalogWriter = Annotated[Principal, Depends(require("catalog:write"))]
+
+
+@router.post("/products/{product_id}/reference-images", status_code=201)
+async def upload_reference_image(product_id: str, principal: CatalogWriter, session: DB, response: Response,
+                                 image: UploadFile = File(...), view: str = Form("front")) -> dict:
+    product = session.get(Product, product_id)
+    if product is None or product.organization_id != principal.organization_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Product not found")
+    data = await image.read(reference_images.MAX_BYTES + 1)
+    try:
+        result = reference_images.add_reference_image(session, principal.organization_id, principal.data_origin,
+                                                      product, data, image.filename, view)
+    except reference_images.ReferenceImageRejected as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    forget_catalogs()
+    if result.created:
+        audit.record(session, principal, "catalog.reference_image_add", "reference_image", result.image.id,
+                     {"product_id": product.id, "sha256": result.image.sha256, "view": view})
+    else:
+        response.status_code = status.HTTP_200_OK
+    session.commit()
+    return reference_images.reference_out(result.image)
+
+
+@router.delete("/reference-images/{image_id}", status_code=204)
+def delete_reference_image(image_id: str, principal: CatalogWriter, session: DB) -> Response:
+    image = session.get(ReferenceImage, image_id)
+    if image is None or image.organization_id != principal.organization_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Reference image not found")
+    audit.record(session, principal, "catalog.reference_image_delete", "reference_image", image.id,
+                 {"product_id": image.product_id, "sha256": image.sha256})
+    session.delete(image)
+    session.commit()
+    forget_catalogs()
+    return Response(status_code=204)

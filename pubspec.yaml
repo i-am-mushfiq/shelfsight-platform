@@ -30,6 +30,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -39,6 +41,8 @@ dependencies:
   http_parser: ^4.1.2
   image_picker: ^1.2.0
   path_provider: ^2.1.6
+  sensors_plus: ^7.1.1
+  panorama_viewer: ^2.0.7
 
 dev_dependencies:
   flutter_test:
@@ -66,6 +70,30 @@ flutter:
 
   assets:
     - assets/branding/shelfsight-logo.png
+
+  # Poppins (SIL Open Font License, see assets/fonts/OFL.txt). Bundled so the
+  # app renders the same offline as online.
+  fonts:
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Poppins-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Poppins-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Poppins-Bold.ttf
+          weight: 700
+    # Hind Siliguri (SIL Open Font License, see assets/fonts/OFL-HindSiliguri.txt): the
+    # Bangla face from the foundry that made Poppins, used for every Bangla glyph.
+    - family: HindSiliguri
+      fonts:
+        - asset: assets/fonts/HindSiliguri-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/HindSiliguri-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/HindSiliguri-SemiBold.ttf
+          weight: 600
 
   # To add assets to your application, add an assets section, like this:
   # assets:

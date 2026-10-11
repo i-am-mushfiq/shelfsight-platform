@@ -47,7 +47,15 @@ def cmd_seed(args: argparse.Namespace) -> None:
             intel = intelligence.analyze(session, summary.organization_id, outlet_id, anchor)
             intelligence.persist(session, summary.organization_id, intel, synthetic.ORIGIN)
         session.commit()
+        sfbl = None
+        if not args.no_sfbl and (SFBL_DIR / "products.csv").is_file():
+            from .services.sfbl_import import import_catalog
+
+            sfbl = import_catalog(session, session.get(Organization, summary.organization_id), SFBL_DIR)
+            session.commit()
     print(json.dumps({**summary.__dict__, "classifications": written, "intelligence_refreshed": len(outlet_ids),
+                      "square_food_catalogue": {"products": sfbl.products_created, "pack_shots": sfbl.pack_shots_added}
+                      if sfbl else "not imported",
                       "login": {"employee_ids": summary.users, "password": synthetic.DEMO_PASSWORD},
                       "warning": "SYNTHETIC DATA — not real market or sales data"}, indent=2))
 
@@ -130,6 +138,64 @@ def cmd_evaluate(args: argparse.Namespace) -> None:
     print(json.dumps({"provider": provider.provider, "version": provider.version, **asdict(report)}, indent=2, default=str))
 
 
+IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+SFBL_DIR = Path("datasets/sfbl_catalog")
+
+
+def cmd_import_sfbl(args: argparse.Namespace) -> None:
+    """Load the scraped Square Food & Beverage catalogue and its pack shots."""
+    from dataclasses import asdict
+
+    from .services.sfbl_import import import_catalog
+
+    with db.session_factory()() as session:
+        summary = import_catalog(session, _org(session, args.org), Path(args.dir))
+        session.commit()
+    print(json.dumps(asdict(summary), indent=2))
+
+
+def cmd_import_pack_shots(args: argparse.Namespace) -> None:
+    """Load catalogue pack shots from a folder. File names are SKUs: SQ-MER-SOAP-100.jpg, or
+    SQ-MER-SOAP-100__back.png for another view (front, back, side, top, angle)."""
+    from .models import Product
+    from .services import reference_images
+
+    folder = Path(args.dir)
+    files = sorted(f for f in folder.iterdir() if f.suffix.lower() in IMAGE_SUFFIXES)
+    report = {"imported": [], "already_present": [], "unknown_sku": [], "rejected": []}
+    with db.session_factory()() as session:
+        org = _org(session, args.org)
+        for path in files:
+            sku, _, view = path.stem.partition("__")
+            product = session.execute(select(Product).where(Product.organization_id == org.id,
+                                                            Product.sku == sku)).scalar_one_or_none()
+            if product is None:
+                report["unknown_sku"].append(path.name)
+                continue
+            try:
+                result = reference_images.add_reference_image(session, org.id, org.data_origin, product,
+                                                               path.read_bytes(), path.name, view or "front")
+            except reference_images.ReferenceImageRejected as exc:
+                report["rejected"].append(f"{path.name}: {exc}")
+                continue
+            report["imported" if result.created else "already_present"].append(path.name)
+        session.commit()
+    print(json.dumps({k: (v if k != "imported" else len(v)) for k, v in report.items()}, indent=2))
+
+
+def cmd_export_training(args: argparse.Namespace) -> None:
+    from dataclasses import asdict
+
+    from .training_export import export, holdout_hashes
+
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    excluded = holdout_hashes(Path(args.eval_dir)) if args.eval_dir else set()
+    with db.session_factory()() as session:
+        summary = export(session, _org(session, args.org), out, excluded)
+    print(json.dumps({"out": str(out), **asdict(summary)}, indent=2))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="retail_platform")
     sub = parser.add_subparsers(required=True)
@@ -137,6 +203,7 @@ def main() -> None:
     seed = sub.add_parser("seed", help="Load the isolated SYNTHETIC demo organization")
     seed.add_argument("--reset", action="store_true", help="Delete and rebuild the synthetic organization")
     seed.add_argument("--anchor", help="Last day of synthetic history (YYYY-MM-DD); default today")
+    seed.add_argument("--no-sfbl", action="store_true", help="Skip importing datasets/sfbl_catalog")
     seed.set_defaults(fn=cmd_seed)
     for name, fn in (("classify", cmd_classify), ("refresh", cmd_refresh)):
         p = sub.add_parser(name)
@@ -156,6 +223,20 @@ def main() -> None:
     evaluation.add_argument("--manifest", default="datasets/eval/smoke-v0/manifest.json")
     evaluation.add_argument("--record", action="store_true")
     evaluation.set_defaults(fn=cmd_evaluate)
+    sfbl = sub.add_parser("import-sfbl-catalog", help="Load the scraped Square Food catalogue and pack shots")
+    sfbl.add_argument("--org", default=synthetic.SLUG)
+    sfbl.add_argument("--dir", default=str(SFBL_DIR))
+    sfbl.set_defaults(fn=cmd_import_sfbl)
+    shots = sub.add_parser("import-pack-shots", help="Load catalogue pack shots named by SKU from a folder")
+    shots.add_argument("--org", default=synthetic.SLUG)
+    shots.add_argument("--dir", required=True)
+    shots.set_defaults(fn=cmd_import_pack_shots)
+    training = sub.add_parser("export-training", help="Export fully reviewed shelf photos as training data")
+    training.add_argument("--org", default=synthetic.SLUG)
+    training.add_argument("--out", required=True)
+    training.add_argument("--eval-dir", default="datasets/eval",
+                          help="Images in any manifest here are never exported (holdout protection)")
+    training.set_defaults(fn=cmd_export_training)
     args = parser.parse_args()
     db.configure()
     args.fn(args)

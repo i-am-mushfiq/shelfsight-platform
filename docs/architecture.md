@@ -335,6 +335,38 @@ Not done yet:
 * Voice: only the deterministic pre-call brief exists. No recording, no transcription.
 * No real Square data has been loaded; everything shown is synthetic.
 
+### Status on 10 October 2026: store type → photos → report → automatic order
+
+Built and covered by tests (87 backend, 8 app):
+
+* **Store types.** Channels carry `is_store_type`, display order, icon and restock depth
+  (`units_per_facing`, inherited down the tree). The demo seeds six as placeholders until
+  Square confirms its own. A visit starts with the officer choosing one; if it differs from
+  the outlet's record, the outlet's channel follows (audited, `store_type_source = field`)
+  and the visit stores both. Admins manage them through `/v2/admin/channels`.
+* **Field registration** of shops not in the outlet master: unverified, assigned to the
+  officer, possible duplicates within 50 m reported.
+* **Whole-shelf recognition** (`vision/claude_shelf.py`): closed-set SKU identification of
+  own and competitor products from the full photo, with catalogue pack shots
+  (`ReferenceImage`, CLI importer). Falls back to the OpenCV baseline when the API fails.
+  `auto` selects it when Anthropic credentials exist. Not yet run against the live API.
+* **Shelf-driven ordering** (`domain/orders.py`, `services/ordering.py`): per product the
+  larger of the usual order and the units needed to restore target facings (core assortment
+  and product placement rules) — only on shelves that were photographed and identified at
+  SKU level; accepted recommendations add to it; pack multiples round it up. Submitting a
+  visit creates the order (`SHELFSIGHT_AUTO_ORDER`: confirm | draft | off), idempotently,
+  skipped if the officer already ordered in that visit; it stays editable and cancellable
+  for 24 h with the original suggestion kept per line.
+* **Visit report** (`services/reports.py`, `GET /v2/visits/{id}/report`): store type and
+  change, photos and models, share of shelf by company, brand, SKU and rack, must-stock
+  availability (missing / low / on shelf / not photographed), placement, actions, the order,
+  and a plain-text summary for messaging apps.
+* **Training export** of fully reviewed photos (YOLO facings + SKU crops), excluding any
+  image in an evaluation manifest.
+
+Still open: real Square data, Bangla UI strings, real GPS, Postgres and Render not exercised,
+and a measured accuracy figure for `claude-shelf` on a field holdout.
+
 After 11 October: M3 offline-first hardening, M4 multimodal SKU recognition at
 scale, M5 trained detector on field data, M6 planogram depth, M7 ML
 classification, M8 order optimisation, M9 sales-call assistant, M10 closed loop.

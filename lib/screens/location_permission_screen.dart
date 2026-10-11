@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
+
 import '../models/session.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_widgets.dart';
@@ -42,33 +44,32 @@ class LocationPermissionScreen extends StatelessWidget {
                     const SizedBox(height: 24),
                     const LocationIllustration(),
                     const SizedBox(height: 24),
-                    const Text(
-                      'Find your current shop',
+                    Text(
+                      t('Find your current shop'),
                       style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
+                        fontSize: AppFontSize.xxl,
+                        fontWeight: FontWeight.w600,
                         letterSpacing: -.6,
                         color: AppColors.ink,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'ShelfSight uses your location while the app is open to '
-                      'identify the retail shop you are visiting.',
-                      style: TextStyle(fontSize: 15.5, height: 1.45),
+                    Text(
+                      t('ShelfSight uses your location while the app is open to identify the retail shop you are visiting.'),
+                      style: TextStyle(fontSize: AppFontSize.lg, height: 1.45),
                     ),
                     const SizedBox(height: 20),
-                    const _Benefit(
+                    _Benefit(
                       icon: Icons.near_me_rounded,
-                      text: 'Detect the nearest assigned shop',
+                      text: t('Detect the nearest assigned shop'),
                     ),
-                    const _Benefit(
+                    _Benefit(
                       icon: Icons.verified_rounded,
-                      text: 'Verify store visits',
+                      text: t('Verify store visits'),
                     ),
-                    const _Benefit(
+                    _Benefit(
                       icon: Icons.photo_camera_rounded,
-                      text: 'Enable shop-specific shelf audits',
+                      text: t('Enable shop-specific shelf audits'),
                     ),
                   ],
                 ),
@@ -79,8 +80,7 @@ class LocationPermissionScreen extends StatelessWidget {
               child: Column(
                 children: [
                   PrimaryButton(
-                    label: 'Allow location',
-                    icon: Icons.my_location_rounded,
+                    label: t('Allow location'),
                     onPressed: () => _continue(context),
                   ),
                   const SizedBox(height: 4),
@@ -90,16 +90,16 @@ class LocationPermissionScreen extends StatelessWidget {
                       minimumSize: const Size(double.infinity, 48),
                       foregroundColor: AppColors.inkMuted,
                     ),
-                    child: const Text(
-                      'Not now',
+                    child: Text(
+                      t('Not now'),
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                        fontSize: AppFontSize.lg,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                   const SizedBox(height: 4),
-                  const Row(
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
@@ -110,9 +110,9 @@ class LocationPermissionScreen extends StatelessWidget {
                       SizedBox(width: 6),
                       Flexible(
                         child: Text(
-                          'Background tracking is not used in this demo',
+                          t('Background tracking is not used in this demo'),
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: AppFontSize.md,
                             color: AppColors.inkMuted,
                           ),
                         ),
@@ -153,8 +153,8 @@ class _Benefit extends StatelessWidget {
           child: Text(
             text,
             style: const TextStyle(
-              fontSize: 15.5,
-              fontWeight: FontWeight.w700,
+              fontSize: AppFontSize.lg,
+              fontWeight: FontWeight.w600,
               color: AppColors.ink,
             ),
           ),

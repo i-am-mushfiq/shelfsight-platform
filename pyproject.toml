@@ -19,7 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 postgres = ["psycopg[binary]>=3.2,<4"]
-llm = ["anthropic>=0.70"]
+llm = ["anthropic>=1.11,<2"]
 
 [dependency-groups]
 dev = ["pytest==9.1.1"]

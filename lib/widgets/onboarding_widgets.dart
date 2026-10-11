@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
+
 import '../theme/app_theme.dart';
 
 /// Rounded logo tile used on every onboarding screen.
@@ -139,7 +141,7 @@ class OnboardingProgress extends StatelessWidget {
           Text(
             'Step $step of $total',
             style: TextStyle(
-              fontSize: 12.5,
+              fontSize: AppFontSize.sm,
               fontWeight: FontWeight.w600,
               color: onDark ? const Color(0xFFB6C2D4) : AppColors.inkMuted,
             ),
@@ -173,7 +175,7 @@ class _EmeraldLoaderState extends State<EmeraldLoader>
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'Loading',
+      label: t('Loading'),
       child: AnimatedBuilder(
         animation: _c,
         builder: (context, _) => Row(
@@ -186,7 +188,10 @@ class _EmeraldLoaderState extends State<EmeraldLoader>
                 width: 6,
                 height:
                     10 +
-                    14 * math.pow(math.sin((_c.value - i * .15) * math.pi), 2).toDouble(),
+                    14 *
+                        math
+                            .pow(math.sin((_c.value - i * .15) * math.pi), 2)
+                            .toDouble(),
                 decoration: BoxDecoration(
                   color: AppColors.emerald,
                   borderRadius: BorderRadius.circular(3),
@@ -222,7 +227,7 @@ class _LocationIllustrationState extends State<LocationIllustration>
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'Map with a pin on a nearby shop',
+      label: t('Map with a pin on a nearby shop'),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(22),
         child: SizedBox(
@@ -335,9 +340,21 @@ class _MiniMapPainter extends CustomPainter {
       ..strokeWidth = 12
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
-    canvas.drawLine(Offset(0, size.height * .62), Offset(size.width, size.height * .5), road);
-    canvas.drawLine(Offset(size.width * .3, 0), Offset(size.width * .38, size.height), road);
-    canvas.drawLine(Offset(size.width * .75, 0), Offset(size.width * .68, size.height), road);
+    canvas.drawLine(
+      Offset(0, size.height * .62),
+      Offset(size.width, size.height * .5),
+      road,
+    );
+    canvas.drawLine(
+      Offset(size.width * .3, 0),
+      Offset(size.width * .38, size.height),
+      road,
+    );
+    canvas.drawLine(
+      Offset(size.width * .75, 0),
+      Offset(size.width * .68, size.height),
+      road,
+    );
   }
 
   @override

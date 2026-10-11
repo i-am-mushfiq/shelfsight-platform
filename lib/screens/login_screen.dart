@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
+
 import '../models/session.dart';
 import '../services/platform_api.dart';
 import '../services/upload_queue.dart';
@@ -70,6 +72,17 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Future<void> _editServer() async {
+    final saved = await showDialog<String>(
+      context: context,
+      builder: (_) => const ServerAddressDialog(),
+    );
+    if (saved != null && mounted) {
+      setState(() => _error = null);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Server set to $saved')));
+    }
+  }
+
   void _showHelp() {
     showModalBottomSheet<void>(
       context: context,
@@ -83,18 +96,16 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Need help signing in?',
+                t('Need help signing in?'),
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 10),
-              const Text(
-                'Accounts are created by your company. If you forgot your '
-                'password or ID, contact your Territory Officer or the IT '
-                'help desk.',
+              Text(
+                t('Accounts are created by your company. If you forgot your password or ID, contact your Territory Officer or the IT help desk.'),
                 style: TextStyle(height: 1.45),
               ),
               const SizedBox(height: 14),
-              const StatusPill(
+              StatusPill(
                 label: 'Server: ${PlatformApi.baseUrl}',
                 icon: Icons.dns_outlined,
               ),
@@ -127,15 +138,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
                   child: Row(
-                    children: const [
+                    children: [
                       BrandMark(size: 52),
                       SizedBox(width: 14),
                       Text(
-                        'ShelfSight',
+                        t('ShelfSight'),
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
+                          fontSize: AppFontSize.xxl,
+                          fontWeight: FontWeight.w600,
                           letterSpacing: -.5,
                         ),
                       ),
@@ -171,22 +182,22 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Welcome back',
+                          Text(
+                            t('Welcome back'),
                             style: TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w800,
+                              fontSize: AppFontSize.xxl,
+                              fontWeight: FontWeight.w600,
                               letterSpacing: -.6,
                               color: AppColors.ink,
                             ),
                           ),
                           const SizedBox(height: 6),
-                          const Text(
-                            'Sign in with your employee credentials',
-                            style: TextStyle(fontSize: 15.5),
+                          Text(
+                            t('Sign in with your employee credentials'),
+                            style: TextStyle(fontSize: AppFontSize.lg),
                           ),
                           const SizedBox(height: 26),
-                          const _FieldLabel('Employee ID'),
+                          _FieldLabel(t('Employee ID')),
                           TextField(
                             controller: _idController,
                             enabled: !_busy,
@@ -196,13 +207,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             onChanged: (_) {
                               if (_error != null) setState(() => _error = null);
                             },
-                            decoration: const InputDecoration(
-                              hintText: 'e.g. SO-1001',
+                            decoration: InputDecoration(
+                              hintText: t('e.g. SO-1001'),
                               prefixIcon: Icon(Icons.badge_outlined),
                             ),
                           ),
                           const SizedBox(height: 18),
-                          const _FieldLabel('Password'),
+                          _FieldLabel(t('Password')),
                           TextField(
                             controller: _passController,
                             enabled: !_busy,
@@ -214,15 +225,15 @@ class _LoginScreenState extends State<LoginScreen> {
                               if (_error != null) setState(() => _error = null);
                             },
                             decoration: InputDecoration(
-                              hintText: 'Enter your password',
+                              hintText: t('Enter your password'),
                               prefixIcon: const Icon(
                                 Icons.lock_outline_rounded,
                               ),
                               errorText: _error,
                               errorStyle: const TextStyle(
                                 color: AppColors.red,
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w700,
+                                fontSize: AppFontSize.md,
+                                fontWeight: FontWeight.w600,
                               ),
                               suffixIcon: IconButton(
                                 tooltip: _obscure
@@ -259,9 +270,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                             () => _remember = v ?? false,
                                           ),
                                         ),
-                                        const Flexible(
+                                        Flexible(
                                           child: Text(
-                                            'Remember employee ID',
+                                            t('Remember employee ID'),
                                             style: TextStyle(
                                               fontWeight: FontWeight.w600,
                                               color: AppColors.ink,
@@ -291,17 +302,32 @@ class _LoginScreenState extends State<LoginScreen> {
                                 minimumSize: const Size(48, 48),
                                 foregroundColor: AppColors.emeraldDark,
                               ),
-                              child: const Text(
-                                'Need help?',
+                              child: Text(
+                                t('Need help?'),
                                 style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: AppFontSize.lg,
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(height: 20),
-                          const Center(
+                          Center(
+                            child: TextButton.icon(
+                              key: const Key('server-address'),
+                              onPressed: _busy ? null : _editServer,
+                              style: TextButton.styleFrom(
+                                minimumSize: const Size(48, 44),
+                                foregroundColor: AppColors.inkMuted,
+                              ),
+                              icon: const Icon(Icons.dns_outlined, size: 18),
+                              label: Text(
+                                'Server: ${Uri.tryParse(PlatformApi.baseUrl)?.authority ?? PlatformApi.baseUrl} · Change',
+                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: AppFontSize.md),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Center(
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -312,9 +338,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                                 SizedBox(width: 6),
                                 Text(
-                                  'Secure, encrypted connection',
+                                  t('Secure, encrypted connection'),
                                   style: TextStyle(
-                                    fontSize: 13,
+                                    fontSize: AppFontSize.md,
                                     color: AppColors.inkMuted,
                                   ),
                                 ),
@@ -347,10 +373,105 @@ class _FieldLabel extends StatelessWidget {
     child: Text(
       text,
       style: const TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w700,
+        fontSize: AppFontSize.base,
+        fontWeight: FontWeight.w600,
         color: AppColors.ink,
       ),
     ),
+  );
+}
+
+/// Lets a demo point the app at a laptop on the same Wi-Fi without rebuilding it.
+class ServerAddressDialog extends StatefulWidget {
+  const ServerAddressDialog({super.key});
+
+  @override
+  State<ServerAddressDialog> createState() => _ServerAddressDialogState();
+}
+
+class _ServerAddressDialogState extends State<ServerAddressDialog> {
+  late final _controller = TextEditingController(text: PlatformApi.baseUrl);
+  bool _testing = false;
+  String? _result;
+  bool _ok = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _show(bool ok, String message) => setState(() {
+    _ok = ok;
+    _result = message;
+  });
+
+  Future<void> _test() async {
+    setState(() {
+      _testing = true;
+      _result = null;
+    });
+    try {
+      final message = await PlatformApi.instance.ping(_controller.text);
+      if (mounted) _show(true, message);
+    } on ApiException catch (error) {
+      if (mounted) _show(false, error.message);
+    } on FormatException {
+      if (mounted) _show(false, 'That is not a valid server address.');
+    } finally {
+      if (mounted) setState(() => _testing = false);
+    }
+  }
+
+  Future<void> _save() async {
+    final navigator = Navigator.of(context);
+    try {
+      navigator.pop(await PlatformApi.instance.setServerAddress(_controller.text));
+    } on ApiException catch (error) {
+      _show(false, error.message);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text(t('Server address')),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          t('For a demo, enter the laptop IP on the same Wi-Fi, e.g. 192.168.0.103 (http:// and port 8000 are added).'),
+          style: TextStyle(height: 1.4),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const Key('server-address-field'),
+          controller: _controller,
+          keyboardType: TextInputType.url,
+          autocorrect: false,
+          onChanged: (_) => setState(() => _result = null),
+          onSubmitted: (_) => _test(),
+          decoration: const InputDecoration(prefixIcon: Icon(Icons.dns_outlined)),
+        ),
+        if (_result != null) ...[
+          const SizedBox(height: 10),
+          Text(
+            _result!,
+            style: TextStyle(color: _ok ? AppColors.emeraldDark : AppColors.red, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ],
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => _controller.text = PlatformApi.defaultBaseUrl,
+        child: Text(t('Default')),
+      ),
+      TextButton(
+        onPressed: _testing ? null : _test,
+        child: Text(_testing ? 'Testing…' : 'Test'),
+      ),
+      FilledButton(onPressed: _save, child: Text(t('Save'))),
+    ],
   );
 }

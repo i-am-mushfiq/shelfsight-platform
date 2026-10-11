@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -11,7 +12,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import text
 
 from . import db
-from .api import admin, analytics, auth, catalog, outlets, visits
+from .api import admin, analytics, auth, catalog, live, orders, outlets, visits
 from .config import get_settings
 from .jobs import Worker
 from .observability import RequestContextMiddleware, configure_logging
@@ -30,6 +31,22 @@ def migrate() -> None:
     command.upgrade(config, "head")
 
 
+def _warm_live_lookup() -> None:
+    from sqlalchemy import select
+
+    from .api.live import _catalog
+    from .models import ReferenceImage
+    from .vision.registry import get_live_matcher
+
+    try:
+        with db.session_factory()() as session:
+            matcher = get_live_matcher()
+            for organization_id in set(session.execute(select(ReferenceImage.organization_id)).scalars()):
+                matcher.index_for(_catalog(session, organization_id, None, matcher))
+    except Exception:  # noqa: BLE001 - warming is an optimisation; the first request builds it otherwise
+        log.exception("could not pre-build the live pack-shot index")
+
+
 def create_app(run_worker: bool | None = None, auto_migrate: bool | None = None, mount_legacy: bool = True) -> FastAPI:
     settings = get_settings()
     if os.getenv("SHELFSIGHT_JSON_LOGS", "1") == "1":
@@ -44,6 +61,8 @@ def create_app(run_worker: bool | None = None, auto_migrate: bool | None = None,
         worker = Worker(db.session_factory()) if run_worker else None
         if worker:
             worker.start()
+            # Build the live pack-shot index now, so the first camera frame is not slow.
+            threading.Thread(target=_warm_live_lookup, name="warm-live-lookup", daemon=True).start()
         yield
         if worker:
             worker.stop()
@@ -58,15 +77,18 @@ def create_app(run_worker: bool | None = None, auto_migrate: bool | None = None,
     origins = [o for o in os.getenv("SHELFSIGHT_CORS_ORIGINS", "").split(",") if o]
     if origins:
         app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["*"], allow_headers=["*"])
-    for module in (auth, catalog, outlets, visits, analytics, admin):
+    for module in (auth, catalog, outlets, orders, visits, live, analytics, admin):
         app.include_router(module.router)
 
     @app.get("/health", tags=["ops"])
     def health() -> dict:
         with db.engine().connect() as connection:
             connection.execute(text("SELECT 1"))
+        from .vision.registry import resolve_provider_name
+
         return {"status": "ok", "service": "shelfsight-platform", "version": app.version,
-                "vision_provider": settings.vision_provider, "environment": settings.environment}
+                "vision_provider": resolve_provider_name(settings), "vision_provider_setting": settings.vision_provider,
+                "auto_order": settings.auto_order, "environment": settings.environment}
 
     @app.get("/metrics", include_in_schema=False)
     def metrics() -> PlainTextResponse:

@@ -52,3 +52,7 @@ def capture_key(organization_id: str, digest: str, extension: str) -> str:
 
 def artifact_key(organization_id: str, inference_id: str) -> str:
     return f"{organization_id}/artifacts/{inference_id}.jpg"
+
+
+def reference_key(organization_id: str, digest: str, extension: str) -> str:
+    return f"{organization_id}/reference/{digest[:2]}/{digest}.{extension}"
