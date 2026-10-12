@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
 import '../l10n/l10n.dart';
+import '../recognition/debug_log.dart';
 import '../recognition/on_device.dart';
 
 import '../services/platform_api.dart';
@@ -29,6 +30,7 @@ class _LiveScanScreenState extends State<LiveScanScreen> with WidgetsBindingObse
   CameraController? _controller;
   String? _cameraError;
   String? _networkError;
+  int _frames = 0;
   bool _running = true;
   bool _looping = false;
   Map<String, dynamic>? _result;
@@ -63,8 +65,12 @@ class _LiveScanScreenState extends State<LiveScanScreen> with WidgetsBindingObse
         orElse: () => cameras.first,
       );
       // Medium resolution keeps each frame small enough for several lookups a second over Wi-Fi.
-      final controller = CameraController(camera, ResolutionPreset.high,
-          enableAudio: false, imageFormatGroup: ImageFormatGroup.jpeg);
+      final controller = CameraController(
+        camera,
+        ResolutionPreset.high,
+        enableAudio: false,
+        imageFormatGroup: ImageFormatGroup.jpeg,
+      );
       await controller.initialize();
       await controller.setFlashMode(FlashMode.off);
       if (!mounted) {
@@ -99,9 +105,21 @@ class _LiveScanScreenState extends State<LiveScanScreen> with WidgetsBindingObse
       // With no server, a signed-in scan goes through the in-app server, which recognises on
       // the phone too and keeps to the rack's category as the server would.
       final viaApp = PlatformApi.offline && PlatformApi.instance.signedIn;
+      if (_frames++ % 10 == 0) {
+        RecognitionLog.log(
+          'live: frame $_frames via ${widget.onDevice && !viaApp
+              ? 'phone recogniser'
+              : viaApp
+              ? 'in-app server'
+              : 'network server'}',
+        );
+      }
       final result = widget.onDevice && !viaApp
-          ? await OnDeviceRecognizer.instance.recognize(await File(frame.path).readAsBytes(),
-              screenPhoto: OnDeviceRecognizer.screenPhotos.value, maxPacks: 16)
+          ? await OnDeviceRecognizer.instance.recognize(
+              await File(frame.path).readAsBytes(),
+              screenPhoto: OnDeviceRecognizer.screenPhotos.value,
+              maxPacks: 16,
+            )
           : await PlatformApi.instance.liveDetect(frame.path, categoryId: widget.categoryId);
       if (!mounted) return;
       final previous = _lastPath;
@@ -113,13 +131,15 @@ class _LiveScanScreenState extends State<LiveScanScreen> with WidgetsBindingObse
       });
       if (previous != null && !_kept.contains(previous)) _delete(previous);
     } on ApiException catch (error) {
+      RecognitionLog.log('live: API error ${error.message}');
       if (mounted) setState(() => _networkError = error.message);
       await Future<void>.delayed(const Duration(seconds: 1));
     } on CameraException {
       await Future<void>.delayed(const Duration(milliseconds: 300));
-    } catch (error) {
+    } catch (error, stack) {
       // On-device recognition failed (e.g. models not bundled): say so and keep trying.
-      if (mounted) setState(() => _networkError = 'Recognition failed on this phone');
+      RecognitionLog.error('live scan', error, stack);
+      if (mounted) setState(() => _networkError = 'Recognition failed on this phone: $error');
       await Future<void>.delayed(const Duration(seconds: 1));
     }
   }
@@ -136,9 +156,9 @@ class _LiveScanScreenState extends State<LiveScanScreen> with WidgetsBindingObse
     final path = _lastPath;
     if (path == null || _kept.contains(path)) return;
     setState(() => _kept.add(path));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(duration: const Duration(seconds: 1), content: Text('Photo kept (${_kept.length}).')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(duration: const Duration(seconds: 1), content: Text('Photo kept (${_kept.length}).')));
   }
 
   void _togglePause() {
@@ -170,8 +190,14 @@ class _LiveScanScreenState extends State<LiveScanScreen> with WidgetsBindingObse
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(t('Live scan'), style: TextStyle(color: Colors.white)),
-            Text(widget.storeName,
-                style: TextStyle(color: Colors.white.withValues(alpha: .62), fontSize: AppFontSize.sm, fontWeight: FontWeight.w500)),
+            Text(
+              widget.storeName,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: .62),
+                fontSize: AppFontSize.sm,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ],
         ),
         actions: [
@@ -199,15 +225,22 @@ class _LiveScanScreenState extends State<LiveScanScreen> with WidgetsBindingObse
                       Positioned(
                         top: 12,
                         left: 12,
-                        child: _LivePill(
-                          running: _running,
-                          text: _networkError ??
-                              (_roundTripMs == null
-                                  ? (widget.onDevice ? 'Loading models…' : 'Starting…')
-                                  : widget.onDevice
-                                  ? 'On this phone · ${(_roundTripMs! / 1000).toStringAsFixed(1)} s'
-                                  : 'Scanning'),
-                          error: _networkError != null,
+                        // Tap the status pill to open the recognition log.
+                        child: GestureDetector(
+                          onTap: () => Navigator.of(
+                            context,
+                          ).push(MaterialPageRoute(builder: (_) => const RecognitionLogScreen())),
+                          child: _LivePill(
+                            running: _running,
+                            text:
+                                _networkError ??
+                                (_roundTripMs == null
+                                    ? (widget.onDevice ? 'Loading models…' : 'Starting…')
+                                    : widget.onDevice
+                                    ? 'On this phone · ${(_roundTripMs! / 1000).toStringAsFixed(1)} s'
+                                    : 'Scanning'),
+                            error: _networkError != null,
+                          ),
                         ),
                       ),
                     ],
@@ -290,7 +323,9 @@ class _LiveScanScreenState extends State<LiveScanScreen> with WidgetsBindingObse
   Widget _preview(List<Map<String, dynamic>> detections) {
     final controller = _controller;
     if (_cameraError != null) {
-      return Center(child: Text(_cameraError!, style: const TextStyle(color: Colors.white)));
+      return Center(
+        child: Text(_cameraError!, style: const TextStyle(color: Colors.white)),
+      );
     }
     if (controller == null || !controller.value.isInitialized) {
       return const Center(child: CircularProgressIndicator(color: AppColors.emerald));
@@ -368,8 +403,10 @@ class _ProductRow extends StatelessWidget {
               color: own ? AppColors.emeraldDark : AppColors.red,
               borderRadius: BorderRadius.circular(6),
             ),
-            child: Text(own ? 'SQUARE' : 'OTHER',
-                style: const TextStyle(color: Colors.white, fontSize: AppFontSize.xs, fontWeight: FontWeight.w600)),
+            child: Text(
+              own ? 'SQUARE' : 'OTHER',
+              style: const TextStyle(color: Colors.white, fontSize: AppFontSize.xs, fontWeight: FontWeight.w600),
+            ),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -380,7 +417,10 @@ class _ProductRow extends StatelessWidget {
               style: const TextStyle(color: Colors.white),
             ),
           ),
-          Text('$confidence%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+          Text(
+            '$confidence%',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          ),
         ],
       ),
     );
@@ -409,14 +449,21 @@ class LiveDetectionPainter extends CustomPainter {
         path.addPolygon([for (final p in polygon) map(p[0] as num, p[1] as num)], true);
       } else {
         final b = d['box'] as Map;
-        path.addRect(Rect.fromPoints(map(b['x'] as num, b['y'] as num),
-            map((b['x'] as num) + (b['width'] as num), (b['y'] as num) + (b['height'] as num))));
+        path.addRect(
+          Rect.fromPoints(
+            map(b['x'] as num, b['y'] as num),
+            map((b['x'] as num) + (b['width'] as num), (b['y'] as num) + (b['height'] as num)),
+          ),
+        );
       }
       canvas.drawPath(path, Paint()..color = colour.withValues(alpha: .18));
-      canvas.drawPath(path, Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
-        ..color = colour);
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3
+          ..color = colour,
+      );
       final bounds = path.getBounds();
       final label = TextPainter(
         text: TextSpan(
@@ -433,7 +480,10 @@ class LiveDetectionPainter extends CustomPainter {
         maxLines: 1,
         ellipsis: '…',
       )..layout(maxWidth: (bounds.width + 120).clamp(60, size.width));
-      label.paint(canvas, Offset(bounds.left.clamp(0, size.width - label.width), (bounds.top - label.height).clamp(0, size.height)));
+      label.paint(
+        canvas,
+        Offset(bounds.left.clamp(0, size.width - label.width), (bounds.top - label.height).clamp(0, size.height)),
+      );
     }
   }
 

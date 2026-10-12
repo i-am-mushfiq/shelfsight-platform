@@ -80,7 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
     if (saved != null && mounted) {
       setState(() => _error = null);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Server set to $saved')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Recognition: ${PlatformApi.serverLabel}')));
     }
   }
 
@@ -107,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 14),
               StatusPill(
-                label: 'Server: ${PlatformApi.serverLabel}',
+                label: 'Recognition: ${PlatformApi.serverLabel}',
                 icon: Icons.dns_outlined,
               ),
             ],
@@ -337,7 +337,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               icon: const Icon(Icons.dns_outlined, size: 18),
                               label: Text(
-                                'Server: ${PlatformApi.serverLabel} · Change',
+                                'Recognition: ${PlatformApi.serverLabel} · Change',
                                 style: const TextStyle(fontWeight: FontWeight.w600, fontSize: AppFontSize.md),
                               ),
                             ),
@@ -399,7 +399,8 @@ class _FieldLabel extends StatelessWidget {
   );
 }
 
-/// Lets a demo point the app at a laptop on the same Wi-Fi without rebuilding it.
+/// Chooses where the app gets its data and recognises shelves: the models on this phone
+/// (no server), or a laptop server on the same Wi-Fi (its GPU models, usually more accurate).
 class ServerAddressDialog extends StatefulWidget {
   const ServerAddressDialog({super.key});
 
@@ -408,7 +409,10 @@ class ServerAddressDialog extends StatefulWidget {
 }
 
 class _ServerAddressDialogState extends State<ServerAddressDialog> {
-  late final _controller = TextEditingController(text: PlatformApi.baseUrl);
+  late bool _phone = PlatformApi.offline;
+  late final _controller = TextEditingController(
+    text: PlatformApi.offline ? PlatformApi.laptopAddress : PlatformApi.baseUrl,
+  );
   bool _testing = false;
   String? _result;
   bool _ok = false;
@@ -419,18 +423,24 @@ class _ServerAddressDialogState extends State<ServerAddressDialog> {
     super.dispose();
   }
 
+  String get _address => _phone ? PlatformApi.offlineBaseUrl : _controller.text;
+
   void _show(bool ok, String message) => setState(() {
     _ok = ok;
     _result = message;
   });
 
   Future<void> _test() async {
+    if (!_phone && _controller.text.trim().isEmpty) {
+      _show(false, "Enter the laptop's IP address.");
+      return;
+    }
     setState(() {
       _testing = true;
       _result = null;
     });
     try {
-      final message = await PlatformApi.instance.ping(_controller.text);
+      final message = await PlatformApi.instance.ping(_address);
       if (mounted) _show(true, message);
     } on ApiException catch (error) {
       if (mounted) _show(false, error.message);
@@ -442,9 +452,13 @@ class _ServerAddressDialogState extends State<ServerAddressDialog> {
   }
 
   Future<void> _save() async {
+    if (!_phone && _controller.text.trim().isEmpty) {
+      _show(false, "Enter the laptop's IP address.");
+      return;
+    }
     final navigator = Navigator.of(context);
     try {
-      navigator.pop(await PlatformApi.instance.setServerAddress(_controller.text));
+      navigator.pop(await PlatformApi.instance.setServerAddress(_address));
     } on ApiException catch (error) {
       _show(false, error.message);
     }
@@ -452,47 +466,76 @@ class _ServerAddressDialogState extends State<ServerAddressDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: Text(t('Server address')),
-    content: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          t('For a demo without a server, choose On this phone: everything, including recognition, runs on the phone. To use a laptop server, enter its IP on the same Wi-Fi, e.g. 192.168.0.103 (http:// and port 8000 are added).'),
-          style: TextStyle(height: 1.4),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          key: const Key('server-address-field'),
-          controller: _controller,
-          keyboardType: TextInputType.url,
-          autocorrect: false,
-          onChanged: (_) => setState(() => _result = null),
-          onSubmitted: (_) => _test(),
-          decoration: const InputDecoration(prefixIcon: Icon(Icons.dns_outlined)),
-        ),
-        if (_result != null) ...[
-          const SizedBox(height: 10),
+    title: Text(t('Recognition and data')),
+    content: SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<bool>(
+              segments: [
+                ButtonSegment(
+                  value: true,
+                  icon: const Icon(Icons.phone_android_rounded),
+                  label: Text(t('On this phone'), key: const Key('server-on-phone')),
+                ),
+                ButtonSegment(
+                  value: false,
+                  icon: const Icon(Icons.laptop_rounded),
+                  label: Text(t('Laptop server'), key: const Key('server-on-laptop')),
+                ),
+              ],
+              selected: {_phone},
+              showSelectedIcon: false,
+              onSelectionChanged: (v) => setState(() {
+                _phone = v.first;
+                _result = null;
+              }),
+            ),
+          ),
+          const SizedBox(height: 12),
           Text(
-            _result!,
-            style: TextStyle(color: _ok ? AppColors.emeraldDark : AppColors.red, fontWeight: FontWeight.w600),
+            _phone
+                ? t('No server or internet needed. Recognition runs on the phone with small models: quicker to set up, less accurate.')
+                : t("Shelf photos, 360° spheres and Live scan are recognised on the laptop (its GPU models, more accurate). The phone and laptop must be on the same Wi-Fi. Enter the laptop's IP, e.g. 192.168.0.103 (http:// and port 8000 are added)."),
+            style: const TextStyle(height: 1.4),
+          ),
+          if (!_phone) ...[
+            const SizedBox(height: 12),
+            TextField(
+              key: const Key('server-address-field'),
+              controller: _controller,
+              keyboardType: TextInputType.url,
+              autocorrect: false,
+              onChanged: (_) => setState(() => _result = null),
+              onSubmitted: (_) => _test(),
+              decoration: const InputDecoration(prefixIcon: Icon(Icons.dns_outlined), hintText: '192.168.0.103'),
+            ),
+          ],
+          if (_result != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              _result!,
+              style: TextStyle(color: _ok ? AppColors.emeraldDark : AppColors.red, fontWeight: FontWeight.w600),
+            ),
+          ],
+          const SizedBox(height: 8),
+          Text(
+            t('Changing this signs you out.'),
+            style: TextStyle(fontSize: AppFontSize.xs, color: AppColors.inkMuted),
           ),
         ],
-      ],
+      ),
     ),
     actions: [
-      TextButton(
-        key: const Key('server-on-phone'),
-        onPressed: () => setState(() {
-          _controller.text = PlatformApi.offlineBaseUrl;
-          _result = null;
-        }),
-        child: Text(t('On this phone')),
-      ),
-      TextButton(
-        onPressed: _testing ? null : _test,
-        child: Text(_testing ? 'Testing…' : 'Test'),
-      ),
+      if (!_phone)
+        TextButton(
+          onPressed: _testing ? null : _test,
+          child: Text(_testing ? 'Testing…' : 'Test'),
+        ),
+      TextButton(onPressed: () => Navigator.pop(context), child: Text(t('Cancel'))),
       FilledButton(onPressed: _save, child: Text(t('Save'))),
     ],
   );

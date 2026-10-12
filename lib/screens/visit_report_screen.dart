@@ -7,6 +7,7 @@ import '../services/platform_api.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_widgets.dart';
 import '../widgets/shell_widgets.dart';
+import 'detection_review_screen.dart';
 import 'order_screen.dart';
 import 'outlet_screen.dart';
 
@@ -105,6 +106,34 @@ class _VisitReportScreenState extends State<VisitReportScreen> {
     }
   }
 
+  /// Opens the visit's photos to check the packs the model found; the report is refreshed after.
+  Future<void> _checkResults() async {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final visit = await PlatformApi.instance.visit(widget.visitId);
+      final ids = [
+        for (final c in (visit['captures'] as List? ?? const []).cast<Map<String, dynamic>>())
+          if (c['status'] == 'analysed') c['id'] as String,
+      ];
+      if (ids.isEmpty) {
+        messenger.showSnackBar(SnackBar(content: Text(t('No photos with results in this visit.'))));
+        return;
+      }
+      await navigator.push(MaterialPageRoute(
+        builder: (_) => DetectionReviewScreen(
+          storeName: _outlet['name'] as String? ?? '',
+          visitId: widget.visitId,
+          captureIds: ids,
+          reviewOnly: true,
+        ),
+      ));
+      await _load();
+    } on ApiException catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
+
   void _done() {
     final navigator = Navigator.of(context);
     if (widget.closeToOutlet) {
@@ -146,10 +175,20 @@ class _VisitReportScreenState extends State<VisitReportScreen> {
                     SizedBox(
                       height: 56,
                       child: OutlinedButton.icon(
+                        key: const Key('check-results'),
+                        onPressed: _checkResults,
+                        style: OutlinedButton.styleFrom(shape: const StadiumBorder()),
+                        icon: const Icon(Icons.fact_check_outlined),
+                        label: Text(t('Check results')),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      height: 56,
+                      child: OutlinedButton(
                         onPressed: _copy,
                         style: OutlinedButton.styleFrom(shape: const StadiumBorder()),
-                        icon: const Icon(Icons.ios_share_rounded),
-                        label: Text(t('Share')),
+                        child: Tooltip(message: t('Share'), child: const Icon(Icons.ios_share_rounded)),
                       ),
                     ),
                     const SizedBox(width: 10),

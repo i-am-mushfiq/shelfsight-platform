@@ -348,7 +348,7 @@ void fieldFlowTests() {
     // The report lists product and quantity; the reasons are shown when editing the order.
     expect(find.textContaining('Missing on shelf: 0 of 2 facings'), findsNothing);
 
-    await tester.tap(find.text('Share'));
+    await tester.tap(find.byTooltip('Share'));
     await tester.pump();
     expect(copied, startsWith('ShelfSight visit report'));
 

@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_onnxruntime/flutter_onnxruntime.dart';
 
+import 'debug_log.dart';
+
 /// Shelf recognition on the phone, with no server: the same steps as the server's visual
 /// lookup, on phone-sized models bundled in assets/recognition/ (see
 /// tools/build_on_device_models.py):
@@ -30,21 +32,65 @@ class OnDeviceRecognizer {
 
   bool get loaded => _detector != null;
 
-  Future<void> load() => _loading ??= _load();
+  /// The error from the last failed load, if any.
+  Object? loadError;
+
+  /// A failed load is logged and retried on the next call instead of failing forever.
+  Future<void> load() => _loading ??= _load().catchError((Object e, StackTrace st) {
+        loadError = e;
+        _loading = null;
+        RecognitionLog.error('model load', e, st);
+        throw e;
+      });
 
   Future<void> _load() async {
+    final watch = Stopwatch()..start();
+    RecognitionLog.log('load: start');
     final ort = OnnxRuntime();
-    _catalog = RecognitionCatalog.fromJson(
-      jsonDecode(await rootBundle.loadString('assets/recognition/catalog.json')) as Map<String, dynamic>,
-    );
+    try {
+      RecognitionLog.log('load: ORT platform ${await ort.getPlatformVersion()}');
+    } catch (e) {
+      RecognitionLog.log('load: ORT platform version unavailable ($e)');
+    }
+    final catalogText = await rootBundle.loadString('assets/recognition/catalog.json');
+    RecognitionLog.log('load: catalog.json ${catalogText.length} chars (${watch.elapsedMilliseconds} ms)');
+    _catalog = RecognitionCatalog.fromJson(jsonDecode(catalogText) as Map<String, dynamic>);
+    final c = _catalog;
+    RecognitionLog.log('load: catalog ${c.products.length} products, ${c.viewProduct.length} views, '
+        'dim ${c.dim}, input ${c.size}px, detector "${c.detectorName}", embedder "${c.embedderName}"');
+    RecognitionLog.log('load: thresholds clean box=${c.clean.box} accept=${c.clean.accept} other=${c.clean.other} | '
+        'screen box=${c.screen.box} accept=${c.screen.accept} other=${c.screen.other}');
     // XNNPACK (optimised ARM kernels) where available, plain CPU otherwise.
     final options = OrtSessionOptions(intraOpNumThreads: 4, providers: [OrtProvider.XNNPACK, OrtProvider.CPU]);
-    _detector = await ort.createSessionFromAsset('assets/recognition/detector.onnx', options: options);
-    _embedder = await ort.createSessionFromAsset('assets/recognition/embedder.onnx', options: options);
+    Future<OrtSession> open(String asset) async {
+      final t = Stopwatch()..start();
+      RecognitionLog.log('load: opening $asset');
+      OrtSession session;
+      try {
+        session = await ort.createSessionFromAsset(asset, options: options);
+      } catch (e, st) {
+        RecognitionLog.error('open $asset with XNNPACK+CPU', e, st);
+        RecognitionLog.log('load: retrying $asset with CPU only');
+        session = await ort.createSessionFromAsset(asset,
+            options: OrtSessionOptions(intraOpNumThreads: 4, providers: [OrtProvider.CPU]));
+      }
+      RecognitionLog.log('load: $asset ready in ${t.elapsedMilliseconds} ms, '
+          'inputs ${session.inputNames}, outputs ${session.outputNames}');
+      try {
+        RecognitionLog.log('load:   input info ${await session.getInputInfo()}');
+        RecognitionLog.log('load:   output info ${await session.getOutputInfo()}');
+      } catch (e) {
+        RecognitionLog.log('load:   tensor info unavailable ($e)');
+      }
+      return session;
+    }
+
+    _detector = await open('assets/recognition/detector.onnx');
+    _embedder = await open('assets/recognition/embedder.onnx');
+    loadError = null;
+    RecognitionLog.log('load: done in ${watch.elapsedMilliseconds} ms');
   }
 
-  /// Live scan and the demo use this phone's recogniser instead of the server's.
-  static bool enabled = true;
 
   /// Whether shelf photos are taken of a screen (the demo shows shelf images on a monitor):
   /// moire is smoothed and the screen-photo thresholds apply. One setting for every camera.
@@ -60,8 +106,34 @@ class OnDeviceRecognizer {
     int? maxPacks,
     Set<String>? allowedSkus,
   }) async {
+    final call = ++_calls;
+    RecognitionLog.log('#$call recognize: ${bytes.length} bytes, screenPhoto=$screenPhoto, maxPacks=$maxPacks, '
+        'allowedSkus=${allowedSkus?.length ?? 'all'}');
+    try {
+      return await _recognize(call, bytes, screenPhoto: screenPhoto, maxPacks: maxPacks, allowedSkus: allowedSkus);
+    } catch (e, st) {
+      RecognitionLog.error('#$call recognize', e, st);
+      rethrow;
+    }
+  }
+
+  int _calls = 0;
+
+  Future<Map<String, dynamic>> _recognize(
+    int call,
+    Uint8List bytes, {
+    required bool screenPhoto,
+    int? maxPacks,
+    Set<String>? allowedSkus,
+  }) async {
     await load();
     final started = DateTime.now();
+    final stage = Stopwatch()..start();
+    void step(String what) {
+      RecognitionLog.log('#$call $what (${stage.elapsedMilliseconds} ms)');
+      stage.reset();
+    }
+
     final c = _catalog;
     final allowed = allowedSkus == null
         ? null
@@ -69,14 +141,19 @@ class OnDeviceRecognizer {
     final t = screenPhoto ? c.screen : c.clean;
     final refs = screenPhoto ? c.screenReferences : c.cleanReferences;
     final image = await RgbaImage.decode(bytes, maxSide: 1280);
+    step('decoded ${image.sourceWidth}x${image.sourceHeight} -> ${image.width}x${image.height}');
     image.stretchColours();
     if (t.demoire) image.removeMoire();
-    var boxes = await _detect(image, t.box);
+    step('preprocessed (demoire=${t.demoire})');
+    var boxes = await _detect(image, t.box, call);
+    step('detector: ${boxes.length} boxes after suppression (min score ${t.box})');
     if (maxPacks != null && boxes.length > maxPacks) {
       boxes = (boxes.toList()..sort((a, b) => b.area.compareTo(a.area))).sublist(0, maxPacks);
     }
     final crops = [for (final b in boxes) image.crop(b.x0, b.y0, b.x1, b.y1)];
     final features = await _embed(crops);
+    step('embedder: ${features.length} fingerprints');
+    var dropped = 0;
     final looks = <Map<String, dynamic>>[];
     for (var i = 0; i < boxes.length; i++) {
       final f = features[i];
@@ -99,7 +176,10 @@ class OnDeviceRecognizer {
       // 2. Shelf-pack references: closest known Square pack, closest known other pack, and
       //    whether the nearest references are fragments rather than packs.
       final ref = refs.lookup(f, c.dim);
-      if (ref.fragmentVote >= t.fragmentVote) continue;
+      if (ref.fragmentVote >= t.fragmentVote) {
+        dropped++;
+        continue;
+      }
       // 3. Brand names printed in Latin script.
       final (brand, brandP) = c.readBrand(f);
       final brandProduct = brand == null ? null : c.brandProduct[brand]!;
@@ -117,6 +197,11 @@ class OnDeviceRecognizer {
         'brand_read': brand, 'brand_read_probability': _round3(brandP), 'brand_read_competitor': competitor != null,
         'best_product': product == null ? null : c.products[product].sku, 'screen_photo': screenPhoto,
       };
+      if (i < 8) {
+        RecognitionLog.log('#$call   box $i det=${_round3(boxes[i].score)} '
+            'best=${product == null ? '-' : c.products[product].sku} sim=${_round3(similarity)} '
+            'col=${_round3(colour)} score=${_round3(score)}/${t.accept} brand=$brand(${_round3(brandP)})');
+      }
       if (competitor != null && brandP >= t.brandRead) {
         looks.add(_look(box, c.brandProduct[competitor]!, math.min(.99, brandP), 'brand', evidence));
       } else if (product != null && score >= t.accept) {
@@ -125,6 +210,9 @@ class OnDeviceRecognizer {
         looks.add(_look(box, null, math.max(.5, math.min(.95, 1 - ours)), 'visual', {...evidence, 'not_ours': true}));
       }
     }
+    RecognitionLog.log('#$call result: ${looks.length} detections '
+        '(${looks.where((l) => l['product'] != null).length} named, $dropped dropped as fragments) '
+        'in ${DateTime.now().difference(started).inMilliseconds} ms');
     return _response(looks, image, DateTime.now().difference(started).inMilliseconds);
   }
 
@@ -175,7 +263,7 @@ class OnDeviceRecognizer {
     };
   }
 
-  Future<List<_Box>> _detect(RgbaImage image, double minScore) async {
+  Future<List<_Box>> _detect(RgbaImage image, double minScore, int call) async {
     const size = 640;
     final scale = size / math.max(image.width, image.height);
     final w = (image.width * scale).round(), h = (image.height * scale).round();
@@ -193,7 +281,16 @@ class OnDeviceRecognizer {
     }
     final tensor = await OrtValue.fromList(input, [1, 3, size, size]);
     final outputs = await _detector!.run({'images': tensor});
-    final raw = (await outputs.values.first.asFlattenedList()).cast<num>();
+    final first = outputs.values.first;
+    final raw = (await first.asFlattenedList()).cast<num>();
+    var maxScore = 0.0, above = 0;
+    for (var i = 4; i < raw.length; i += 6) {
+      final s = raw[i].toDouble();
+      if (s > maxScore) maxScore = s;
+      if (s >= minScore) above++;
+    }
+    RecognitionLog.log('#$call   detector outputs ${outputs.keys.toList()} shape ${first.shape}: '
+        '${raw.length} values, max score ${_round3(maxScore)}, $above at or over $minScore');
     await tensor.dispose();
     for (final value in outputs.values) {
       await value.dispose();
@@ -230,12 +327,15 @@ class OnDeviceRecognizer {
     return kept;
   }
 
+  int _embedBatch = 16;
+
   Future<List<Float32List>> _embed(List<RgbaImage> crops) async {
     final c = _catalog;
     final s = c.size;
     final result = <Float32List>[];
-    for (var start = 0; start < crops.length; start += 16) {
-      final batch = crops.sublist(start, math.min(crops.length, start + 16));
+    var start = 0;
+    while (start < crops.length) {
+      final batch = crops.sublist(start, math.min(crops.length, start + _embedBatch));
       final input = Float32List(batch.length * 3 * s * s);
       for (var n = 0; n < batch.length; n++) {
         batch[n].writeClipInput(input, n * 3 * s * s, s, c.mean, c.std);
@@ -243,10 +343,20 @@ class OnDeviceRecognizer {
       final tensor = await OrtValue.fromList(input, [batch.length, 3, s, s]);
       final outputs = await _embedder!.run({'pixels': tensor});
       final raw = (await outputs.values.first.asFlattenedList()).cast<num>();
+      RecognitionLog.log('  embedder batch ${batch.length}: shape ${outputs.values.first.shape}, '
+          '${raw.length} values (expected ${batch.length * c.dim})');
       await tensor.dispose();
       for (final value in outputs.values) {
         await value.dispose();
       }
+      if (raw.length < batch.length * c.dim) {
+        if (batch.length == 1) throw StateError('Embedder returned ${raw.length} values, expected ${c.dim}');
+        // Some phones' runtimes return one row for a batch: embed one crop per run from now on.
+        RecognitionLog.log('  embedder ignored the batch; falling back to one crop per run');
+        _embedBatch = 1;
+        continue;
+      }
+      start += batch.length;
       for (var n = 0; n < batch.length; n++) {
         final f = Float32List(c.dim);
         var norm = 0.0;

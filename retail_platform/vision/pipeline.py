@@ -252,7 +252,15 @@ def run_inference(session: Session, capture: ShelfCapture) -> Inference:
 
     started = time.perf_counter()
     try:
-        result = provider.analyze(blob_store().get(capture.blob_key), catalog, own_manufacturer)
+        image = blob_store().get(capture.blob_key)
+        if (capture.device or {}).get("projection") == "equirectangular":
+            # A 360° sphere is recognised on flat views around the horizon, not on the
+            # distorted equirectangular image.
+            from . import photosphere
+
+            result = photosphere.analyze(provider, image, catalog, own_manufacturer)
+        else:
+            result = provider.analyze(image, catalog, own_manufacturer)
     except Exception as exc:
         inference.status = "failed"
         inference.error = str(exc)[:2000]

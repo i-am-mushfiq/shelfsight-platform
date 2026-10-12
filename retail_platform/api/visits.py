@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+from pathlib import Path
 from datetime import datetime
 
 import cv2
@@ -28,7 +30,7 @@ from ..models import (
 )
 from ..security import Principal, distance_m
 from ..services import intelligence, loaders, ordering, reports
-from ..vision import pipeline, sphere
+from ..vision import photosphere, pipeline, sphere
 from ..vision.imaging import decode_upright
 from .deps import DB, CurrentPrincipal, outlet_or_404, require
 from .outlets import serialize_intelligence, store_type_or_422
@@ -219,6 +221,8 @@ def upload_sphere(
     frames: list[UploadFile] = File(...),
     client_capture_id: str = Form(..., min_length=8, max_length=64),
     yaws: str | None = Form(default=None, max_length=4000),
+    pitches: str | None = Form(default=None, max_length=4000),
+    rolls: str | None = Form(default=None, max_length=4000),
     category_id: str | None = Form(default=None),
 ) -> dict:
     """A 360° photo sphere: frames taken while turning on the spot, with the yaw (degrees) of each.
@@ -241,20 +245,42 @@ def upload_sphere(
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown category")
     try:
         yaw_values = [float(v) for v in json.loads(yaws)] if yaws else None
+        pitch_values = [float(v) for v in json.loads(pitches)] if pitches else None
+        roll_values = [float(v) for v in json.loads(rolls)] if rolls else None
     except (json.JSONDecodeError, TypeError, ValueError) as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "yaws must be a JSON list of numbers") from exc
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            "yaws, pitches and rolls must be JSON lists of numbers") from exc
     images = []
     for upload in frames:
         image = decode_upright(upload.file.read(pipeline.get_settings().max_upload_bytes + 1))
         if image is None:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Frame {upload.filename} is not a readable image")
         images.append(image)
-    result = sphere.stitch(images, yaw_values)
+    # Frames with a full orientation each (the guided capture) are placed on a 360° × 180° sphere
+    # by orientation; older app builds send only yaws and get the feature-matched panorama.
+    oriented = (yaw_values is not None and pitch_values is not None and roll_values is not None
+                and len(yaw_values) == len(pitch_values) == len(roll_values) == len(images))
+    if oriented and os.environ.get("SHELFSIGHT_KEEP_SPHERE_FRAMES") == "1":
+        # Development aid: keep the raw frames and orientations so stitching can be re-run.
+        keep = Path(get_settings().blob_directory) / "sphere_frames" / client_capture_id
+        keep.mkdir(parents=True, exist_ok=True)
+        for k, image in enumerate(images):
+            cv2.imwrite(str(keep / f"{k:02d}.jpg"), image)
+        (keep / "poses.json").write_text(json.dumps({"yaws": yaw_values, "pitches": pitch_values,
+                                                     "rolls": roll_values}))
+    if oriented:
+        result = photosphere.stitch(images, [photosphere.Pose(y, p, r) for y, p, r
+                                             in zip(yaw_values, pitch_values, roll_values)])
+    else:
+        result = sphere.stitch(images, yaw_values)
     ok, encoded = cv2.imencode(".jpg", result.image, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
     if not ok:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Panorama could not be encoded")
+    jpeg = encoded.tobytes()
+    if oriented:
+        jpeg = photosphere.with_photosphere_xmp(jpeg, result.image.shape[1], result.image.shape[0])
     try:
-        ingested = pipeline.ingest_capture(session, principal, visit, encoded.tobytes(), "image/jpeg", "sphere.jpg",
+        ingested = pipeline.ingest_capture(session, principal, visit, jpeg, "image/jpeg", "sphere.jpg",
                                            client_capture_id, "360° photo sphere", category_id, utcnow(),
                                            result.metadata())
         session.commit()

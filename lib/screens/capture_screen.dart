@@ -1,5 +1,11 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img;
+import 'package:sensors_plus/sensors_plus.dart';
 
 import '../l10n/l10n.dart';
 import 'package:image_picker/image_picker.dart';
@@ -7,7 +13,6 @@ import 'package:image_picker/image_picker.dart';
 import '../models/field_models.dart';
 import '../services/platform_api.dart';
 import '../theme/app_theme.dart';
-import '../recognition/on_device.dart';
 import '../services/upload_queue.dart';
 import '../widgets/screen_photo_toggle.dart';
 import 'detection_review_screen.dart';
@@ -50,6 +55,21 @@ class _CaptureScreenState extends State<CaptureScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initializeCamera();
+    // The screen is portrait-only and some phones write no EXIF orientation, so which way the
+    // phone is held is read from gravity and each photo is turned upright before upload.
+    _tilt = accelerometerEventStream(samplingPeriod: SensorInterval.uiInterval).listen((e) => _gravity = e);
+  }
+
+  StreamSubscription<AccelerometerEvent>? _tilt;
+  AccelerometerEvent? _gravity;
+
+  /// Clockwise quarter turns that make a photo taken right now upright.
+  int get _uprightTurns {
+    final g = _gravity;
+    if (g == null) return 0;
+    if (g.x.abs() > g.y.abs() && g.x.abs() > 4) return g.x > 0 ? 3 : 1; // landscape
+    if (g.y < -4 && g.y.abs() > g.x.abs()) return 2; // upside down
+    return 0;
   }
 
   @override
@@ -78,7 +98,7 @@ class _CaptureScreenState extends State<CaptureScreen>
       );
       final controller = CameraController(
         camera,
-        ResolutionPreset.high,
+        ResolutionPreset.veryHigh, // 1080p: small packs need the pixels
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
@@ -137,8 +157,11 @@ class _CaptureScreenState extends State<CaptureScreen>
     }
     setState(() => _capturing = true);
     try {
+      final turns = _uprightTurns;
       final photo = await controller.takePicture();
-      if (mounted) _add([photo.path]);
+      final path = turns == 0 ? photo.path : await compute(_rotateJpeg, (photo.path, turns * 90));
+      debugPrint('[capture] photo turned ${turns * 90}° clockwise to be upright');
+      if (mounted) _add([path]);
     } on CameraException {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -173,7 +196,7 @@ class _CaptureScreenState extends State<CaptureScreen>
 
   Future<void> _liveScan() async {
     final kept = await _withCameraReleased<List<String>>(MaterialPageRoute(
-      builder: (_) => LiveScanScreen(storeName: widget.storeName, categoryId: _rackId, onDevice: OnDeviceRecognizer.enabled),
+      builder: (_) => LiveScanScreen(storeName: widget.storeName, categoryId: _rackId, onDevice: PlatformApi.offline),
     ));
     if (kept != null && kept.isNotEmpty && mounted) _add(kept);
   }
@@ -262,6 +285,7 @@ class _CaptureScreenState extends State<CaptureScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _cameraController?.dispose();
+    _tilt?.cancel();
     super.dispose();
   }
 
@@ -274,6 +298,7 @@ class _CaptureScreenState extends State<CaptureScreen>
         visitId: widget.visitId,
         captureIds: [for (final s in _spheres) s['id'] as String],
         followQueue: true,
+        autoFinish: true,
       ),
     ),
   );
@@ -356,9 +381,9 @@ class _CaptureScreenState extends State<CaptureScreen>
                   _SideAction(icon: Icons.photo_library_outlined, label: t('Gallery'), onTap: _pickFromGallery),
                   _Shutter(busy: _capturing, onTap: _takePhoto),
                   _SideAction(
-                    icon: Icons.arrow_forward_rounded,
+                    icon: Icons.flag_outlined,
                     count: captures,
-                    label: t('Next'),
+                    label: t('Finish visit'),
                     onTap: _hasCaptures ? _review : null,
                   ),
                 ],
@@ -598,4 +623,15 @@ class _GridPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Rotates a JPEG clockwise by [job].$2 degrees (in a background isolate) and returns the new path.
+String _rotateJpeg((String, int) job) {
+  final (path, degrees) = job;
+  final image = img.decodeJpg(File(path).readAsBytesSync());
+  if (image == null) return path;
+  final rotated = img.copyRotate(img.bakeOrientation(image), angle: degrees);
+  final out = '${path.substring(0, path.lastIndexOf('.'))}_upright.jpg';
+  File(out).writeAsBytesSync(img.encodeJpg(rotated, quality: 92));
+  return out;
 }

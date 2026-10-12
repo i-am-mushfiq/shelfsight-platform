@@ -251,6 +251,42 @@ def test_sphere_upload_becomes_one_analysed_capture(platform, officer, scripted_
     assert one.status_code == 422
 
 
+def test_oriented_sphere_becomes_a_full_photosphere_analysed_on_flat_views(platform, officer, scripted_provider):
+    """The guided capture sends yaw, pitch and roll per frame: the result is a 360° × 180°
+    equirectangular image with Google photo-sphere metadata, recognised view by view."""
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).parent))
+    from test_photosphere import _render, _scene, _targets
+
+    client = platform["client"]
+    outlets = client.get("/v2/outlets", headers=officer).json()
+    visit = client.post("/v2/visits", headers=officer, json={
+        "client_visit_id": uuid.uuid4().hex, "outlet_id": outlets[1]["id"]}).json()
+    scene = _scene()
+    poses = [p for p in _targets() if p.pitch == 0]
+    files = [("frames", (f"f{i}.jpg", cv2.imencode(".jpg", _render(scene, p))[1].tobytes(), "image/jpeg"))
+             for i, p in enumerate(poses)]
+    data = {"client_capture_id": uuid.uuid4().hex, "yaws": json.dumps([p.yaw for p in poses]),
+            "pitches": json.dumps([p.pitch for p in poses]), "rolls": json.dumps([p.roll for p in poses])}
+    response = client.post(f"/v2/visits/{visit['id']}/spheres", headers=officer, files=files, data=data)
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["sphere"]["projection"] == "equirectangular"
+    assert body["sphere"]["horizontal_degrees"] == 360.0 and body["sphere"]["vertical_degrees"] == 180.0
+    assert body["width"] == 2 * body["height"]
+    image = client.get(f"/v2/captures/{body['id']}/image", headers=officer).content
+    assert b"GPano:ProjectionType" in image[:4000]
+    jobs.drain(db.session_factory())
+    capture = client.get(f"/v2/captures/{body['id']}", headers=officer).json()
+    assert capture["status"] == "analysed"
+    # Boxes from the flat views land on the sphere image, inside its bounds.
+    for d in capture["detections"]:
+        assert 0 <= d["box"]["x"] <= 1 and 0 <= d["box"]["y"] <= 1
+        assert "sphere_view" in d["evidence"]
+
+
 def test_square_food_catalogue_import(platform, tmp_path):
     from retail_platform.services.sfbl_import import import_catalog
 

@@ -9,6 +9,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
+import '../recognition/debug_log.dart';
 import '../recognition/on_device.dart';
 import 'field_logic.dart';
 
@@ -192,7 +193,13 @@ class OfflineBackend extends http.BaseClient {
     try {
       response = await _route(_Request(request.method, segments, request.url.queryParameters, headers, json, fields, files));
     } on _Fail catch (fail) {
+      if (fail.status >= 500 || segments.contains('live') || segments.contains('captures')) {
+        RecognitionLog.log('offline ${request.method} ${request.url.path} -> ${fail.status} ${fail.detail}');
+      }
       response = _Response(fail.status, {'detail': fail.detail});
+    } catch (error, stack) {
+      RecognitionLog.error('offline ${request.method} ${request.url.path}', error, stack);
+      response = _Response(500, {'detail': 'On-device error: $error'});
     }
     final bytes = response.bytes ?? utf8.encode(jsonEncode(response.body));
     return http.StreamedResponse(
@@ -904,14 +911,25 @@ class OfflineBackend extends http.BaseClient {
     final visit = _openVisit(user, visitId, categoryId);
     final existing = _existingCapture(visitId, clientId);
     if (existing != null) return _Response(200, {..._captureOut(existing), 'replayed': true});
-    final frames = r.files['frames'] ?? const [];
+    var frames = r.files['frames'] ?? const [];
     if (frames.length < 2 || frames.length > 36) throw const _Fail(422, 'Send between 2 and 36 frames');
     List<double>? yaws;
+    List<double>? pitches;
     try {
       final raw = r.fields['yaws'];
       yaws = raw == null ? null : [for (final v in jsonDecode(raw) as List) (v as num).toDouble()];
+      final rawPitches = r.fields['pitches'];
+      pitches = rawPitches == null ? null : [for (final v in jsonDecode(rawPitches) as List) (v as num).toDouble()];
     } catch (_) {
       throw const _Fail(422, 'yaws must be a JSON list of numbers');
+    }
+    // On the phone the frames are placed side by side, so only the eye-level ring is used.
+    if (yaws != null && pitches != null && pitches.length == frames.length && yaws.length == frames.length) {
+      final level = [for (var i = 0; i < frames.length; i++) if (pitches[i].abs() < 20) i];
+      if (level.length >= 2) {
+        frames = [for (final i in level) frames[i]];
+        yaws = [for (final i in level) yaws[i]];
+      }
     }
     // Frames in the order they were taken around the circle.
     final order = List<int>.generate(frames.length, (i) => i);
@@ -960,7 +978,10 @@ class OfflineBackend extends http.BaseClient {
   }
 
   void _queueAnalysis(String captureId) {
-    _analysis = _analysis.then((_) => _analyse(captureId)).catchError((Object _) {});
+    RecognitionLog.log('offline: queued analysis of capture $captureId');
+    _analysis = _analysis.then((_) => _analyse(captureId)).catchError((Object e, StackTrace st) {
+      RecognitionLog.error('offline analysis queue ($captureId)', e, st);
+    });
   }
 
   /// Waits for photos already sent to be recognised (tests, and the reset).
@@ -973,6 +994,8 @@ class OfflineBackend extends http.BaseClient {
     final c = _captures[captureId] as Json?;
     if (c == null || (c['status'] != 'uploaded' && c['status'] != 'analysing')) return;
     c['status'] = 'analysing';
+    RecognitionLog.log('offline: analysing capture $captureId (file ${c['file']}, frames ${(c['frame_files'] as List?)?.length ?? 0}, '
+        'category ${c['category_id']})');
     final started = DateTime.now();
     final screen = c['screen_photo'] as bool? ?? true;
     final allowed = _allowedSkus(c['category_id'] as String?);
@@ -1014,6 +1037,7 @@ class OfflineBackend extends http.BaseClient {
           'error': null, 'model': _model, 'annotated_url': null,
         }
         ..['status'] = 'analysed';
+      RecognitionLog.log('offline: capture $captureId analysed, ${looks.length} detections');
       if (frames != null) {
         for (final f in frames) {
           final file = File('${_dir.path}/images/$f');
@@ -1021,7 +1045,8 @@ class OfflineBackend extends http.BaseClient {
         }
         c.remove('frame_files');
       }
-    } catch (error) {
+    } catch (error, stack) {
+      RecognitionLog.error('offline analysis of capture $captureId', error, stack);
       c
         ..['status'] = 'failed'
         ..['inference'] = {

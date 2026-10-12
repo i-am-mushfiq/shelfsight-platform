@@ -4,6 +4,7 @@ import '../l10n/l10n.dart';
 
 import '../models/session.dart';
 import '../offline/offline_backend.dart';
+import '../recognition/debug_log.dart';
 import '../services/platform_api.dart';
 import '../theme/app_theme.dart';
 import 'login_screen.dart';
@@ -236,6 +237,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const Divider(height: 1, indent: 56),
                     _SettingsRow(
+                      icon: PlatformApi.offline ? Icons.phone_android_rounded : Icons.laptop_rounded,
+                      title: 'Recognition',
+                      trailing: PlatformApi.serverLabel,
+                      onTap: _chooseRecognition,
+                    ),
+                    const Divider(height: 1, indent: 56),
+                    _SettingsRow(
+                      icon: Icons.bug_report_outlined,
+                      title: 'Recognition log',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const RecognitionLogScreen()),
+                      ),
+                    ),
+                    const Divider(height: 1, indent: 56),
+                    _SettingsRow(
                       icon: Icons.help_outline_rounded,
                       title: t('Help & support'),
                       onTap: () => Navigator.of(context).push(
@@ -295,6 +311,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+
+  /// Phone models or the laptop server. A token only works on its own server, so a change
+  /// signs out and goes back to the sign-in screen.
+  Future<void> _chooseRecognition() async {
+    final before = PlatformApi.baseUrl;
+    final saved = await showDialog<String>(context: context, builder: (_) => const ServerAddressDialog());
+    if (saved == null || saved == before || !mounted) return;
+    PlatformApi.instance.signOut();
+    currentSession.value = null;
+    Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Recognition: ${PlatformApi.serverLabel}. Sign in again.')),
+    );
+  }
 
   /// Without a server the demo's visits, photos, orders and new shops live on this phone;
   /// this clears them so the next demo starts from the shipped data.

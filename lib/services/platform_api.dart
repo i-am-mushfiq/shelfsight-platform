@@ -67,7 +67,13 @@ class PlatformApi {
   static bool get offline => baseUrl == offlineBaseUrl;
 
   /// How the sign-in screen names where the app gets its data.
-  static String get serverLabel => offline ? 'On this phone (no server)' : Uri.tryParse(baseUrl)?.authority ?? baseUrl;
+  static String get serverLabel => offline ? 'On this phone' : 'Laptop · ${Uri.tryParse(baseUrl)?.authority ?? baseUrl}';
+
+  /// The last laptop server used, so switching back from On this phone needs no retyping.
+  static String laptopAddress = '';
+
+  static Future<File> _laptopFile() async =>
+      File('${(await getApplicationDocumentsDirectory()).path}/laptop_address.txt');
 
   static Future<File> _serverFile() async =>
       File('${(await getApplicationDocumentsDirectory()).path}/server_address_v2.txt');
@@ -80,6 +86,9 @@ class PlatformApi {
         final saved = (await file.readAsString()).trim();
         if (saved.isNotEmpty) baseUrl = saved;
       }
+      final laptop = await _laptopFile();
+      if (await laptop.exists()) laptopAddress = (await laptop.readAsString()).trim();
+      if (laptopAddress.isEmpty && !offline) laptopAddress = baseUrl;
     } catch (_) {
       // No storage (tests) or unreadable file: keep the built-in address.
     }
@@ -113,7 +122,9 @@ class PlatformApi {
     }
     baseUrl = value;
     _token = null;
+    if (value != offlineBaseUrl) laptopAddress = value;
     try {
+      if (value != offlineBaseUrl) await (await _laptopFile()).writeAsString(value);
       final file = await _serverFile();
       if (value == defaultBaseUrl) {
         if (await file.exists()) await file.delete();
@@ -395,6 +406,8 @@ class PlatformApi {
     required String visitId,
     required List<String> framePaths,
     required List<double> yaws,
+    List<double>? pitches,
+    List<double>? rolls,
     required String clientCaptureId,
     String? categoryId,
   }) async {
@@ -402,6 +415,9 @@ class PlatformApi {
       ..headers.addAll(_headers)
       ..fields['client_capture_id'] = clientCaptureId
       ..fields['yaws'] = jsonEncode(yaws);
+    // With pitch and roll per frame the server builds a full 360° × 180° photo sphere.
+    if (pitches != null) request.fields['pitches'] = jsonEncode(pitches);
+    if (rolls != null) request.fields['rolls'] = jsonEncode(rolls);
     if (categoryId != null) request.fields['category_id'] = categoryId;
     for (final path in framePaths) {
       request.files.add(await http.MultipartFile.fromPath('frames', path, contentType: _mediaType(path)));

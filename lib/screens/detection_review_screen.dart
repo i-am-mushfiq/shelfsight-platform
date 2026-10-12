@@ -11,6 +11,7 @@ import '../theme/app_theme.dart';
 import '../widgets/app_widgets.dart';
 import '../widgets/shell_widgets.dart';
 import 'visit_report_screen.dart';
+import 'shelf_result_screen.dart';
 
 Color labelColor(String label, String verification) {
   if (verification == 'rejected') return AppColors.inkSubtle;
@@ -30,6 +31,8 @@ class DetectionReviewScreen extends StatefulWidget {
     required this.visitId,
     required this.captureIds,
     this.followQueue = false,
+    this.autoFinish = false,
+    this.reviewOnly = false,
   });
   final String storeName;
   final String visitId;
@@ -37,6 +40,13 @@ class DetectionReviewScreen extends StatefulWidget {
 
   /// Also shows the visit's photos still being read, adding each one as soon as it is ready.
   final bool followQueue;
+
+  /// Finish the visit as soon as every photo is read, without asking about packs first
+  /// (packs can still be checked afterwards from the visit report).
+  final bool autoFinish;
+
+  /// Opened from a finished visit's report: check packs only, no Finish visit button.
+  final bool reviewOnly;
 
   @override
   State<DetectionReviewScreen> createState() => _DetectionReviewScreenState();
@@ -56,6 +66,7 @@ class _DetectionReviewScreenState extends State<DetectionReviewScreen> {
   final Set<String> _skipped = {};
   String? _error;
   bool _busy = false;
+  String? _finishError; // auto-finish stopped on this error until Try again
 
   String? get _captureId => _ids.isEmpty ? null : _ids[_photo];
   Map<String, dynamic>? get _capture => _captures[_captureId];
@@ -134,6 +145,12 @@ class _DetectionReviewScreenState extends State<DetectionReviewScreen> {
       if (_waiting.isEmpty && !widget.followQueue) _poll?.cancel();
       if (!mounted) return;
       setState(() {});
+      if (widget.autoFinish) {
+        if (!_busy && _finishError == null && _waiting.isEmpty && (_ids.isNotEmpty || _unreadable > 0)) {
+          await _submit();
+        }
+        return;
+      }
       if (_ids.isNotEmpty && _images.isEmpty) {
         await _loadImage();
         _selectNext();
@@ -226,6 +243,19 @@ class _DetectionReviewScreenState extends State<DetectionReviewScreen> {
     try {
       final result = await _api.submitVisit(widget.visitId);
       await UploadQueue.instance.clearVisit(widget.visitId);
+      if (widget.autoFinish) {
+        // Straight to the photos with what was found drawn on them; the result follows.
+        navigator.pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => ShelfResultScreen(
+              visitId: widget.visitId,
+              captureIds: List.of(_ids),
+              report: result['report'] as Map<String, dynamic>,
+            ),
+          ),
+        );
+        return;
+      }
       navigator.pushReplacement(
         MaterialPageRoute(
           builder: (_) => VisitReportScreen(
@@ -236,10 +266,70 @@ class _DetectionReviewScreenState extends State<DetectionReviewScreen> {
         ),
       );
     } on ApiException catch (error) {
-      messenger.showSnackBar(SnackBar(content: Text(error.message)));
+      if (widget.autoFinish) {
+        // "Still being analysed" clears itself on a later tick; anything else waits for Try again.
+        final transient = error.message.contains('still being analysed');
+        if (mounted) setState(() => _finishError = transient ? null : error.message);
+      } else {
+        messenger.showSnackBar(SnackBar(content: Text(error.message)));
+      }
       if (mounted) setState(() => _busy = false);
     }
   }
+
+  Widget _finishing(int reading) => Scaffold(
+    backgroundColor: AppColors.canvas,
+    appBar: AppBar(title: Text(t('Finishing visit'))),
+    body: Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_finishError ?? _error case final message?) ...[
+              const Icon(Icons.error_outline_rounded, color: AppColors.red, size: 40),
+              const SizedBox(height: 12),
+              Text(message, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              PrimaryButton(
+                label: t('Try again'),
+                onPressed: () {
+                  setState(() => _finishError = null);
+                  _error != null ? _loadAll() : _gather();
+                },
+              ),
+            ] else ...[
+              const CircularProgressIndicator(),
+              const SizedBox(height: 20),
+              Text(
+                _busy
+                    ? 'Working out the result and the order…'
+                    : reading > 0
+                    ? 'Reading ${reading == 1 ? 'the last photo' : '$reading photos'}…'
+                    : 'Getting the photos ready…',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'You can check the packs on the next page.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.inkMuted),
+              ),
+              if (_unreadable > 0) ...[
+                const SizedBox(height: 8),
+                Text(
+                  '$_unreadable photo${_unreadable == 1 ? '' : 's'} could not be read and will be left out.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppColors.inkMuted),
+                ),
+              ],
+            ],
+          ],
+        ),
+      ),
+    ),
+  );
 
   String _productName(String? id) =>
       _products.where((p) => p['id'] == id).map((p) => p['name'] as String).firstOrNull ?? '';
@@ -284,6 +374,7 @@ class _DetectionReviewScreenState extends State<DetectionReviewScreen> {
     final pending = _pending;
     final position = current == null ? 0 : pending.indexWhere((d) => d['id'] == current['id']) + 1;
     final nextPhoto = _nextPhotoWithWork;
+    if (widget.autoFinish) return _finishing(reading);
     return Scaffold(
       backgroundColor: AppColors.canvas,
       appBar: AppBar(
@@ -303,7 +394,7 @@ class _DetectionReviewScreenState extends State<DetectionReviewScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: SafeArea(
+      bottomNavigationBar: widget.reviewOnly ? null : SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(AppSpace.page, 8, AppSpace.page, 12),
           child: PrimaryButton(
@@ -365,6 +456,7 @@ class _DetectionReviewScreenState extends State<DetectionReviewScreen> {
                   ),
                 ] else
                   _Done(
+                    reviewOnly: widget.reviewOnly,
                     nextPhoto: nextPhoto == null ? null : nextPhoto + 1,
                     unverified: _unverified,
                     busy: _busy,
@@ -606,12 +698,14 @@ class _Answer extends StatelessWidget {
 /// Shown when nothing on this photo needs an answer.
 class _Done extends StatelessWidget {
   const _Done({
+    this.reviewOnly = false,
     required this.nextPhoto,
     required this.unverified,
     required this.busy,
     required this.onNextPhoto,
     required this.onConfirmRest,
   });
+  final bool reviewOnly;
   final int? nextPhoto;
   final int unverified;
   final bool busy;
@@ -631,7 +725,7 @@ class _Done extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           nextPhoto == null
-              ? 'Tap Finish visit to see the result and the order.'
+              ? (reviewOnly ? 'Go back to see the updated result.' : 'Tap Finish visit to see the result and the order.')
               : 'Photo $nextPhoto still has packs to check.',
           style: const TextStyle(color: AppColors.inkMuted),
         ),
